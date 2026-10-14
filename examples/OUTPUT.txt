@@ -1,0 +1,383 @@
+toolchain: rustc 1.98.1 (48a229cea 2026-09-01)
+host:      x86_64-unknown-linux-gnu
+date:      2026-10-14
+
+===== move.rs  (expected: does not compile)
+error[E0382]: borrow of moved value: `a`
+ --> move.rs:5:16
+  |
+3 |     let a = String::from("hi");
+  |         - move occurs because `a` has type `String`, which does not implement the `Copy` trait
+4 |     let b = a;
+  |             - value moved here
+5 |     println!("{a}");
+  |                ^ value borrowed here after move
+  |
+help: consider cloning the value if the performance cost is acceptable
+  |
+4 |     let b = a.clone();
+  |              ++++++++
+
+ --> move.rs:4:9
+  |
+4 |     let b = a;
+  |         ^ help: if this is intentional, prefix it with an underscore: `_b`
+  |
+
+error: aborting due to 1 previous error; 1 warning emitted
+
+For more information about this error, try `rustc --explain E0382`.
+
+===== dangle.rs  (expected: does not compile)
+error[E0106]: missing lifetime specifier
+ --> dangle.rs:2:16
+  |
+2 | fn dangle() -> &String {
+  |                ^ expected named lifetime parameter
+  |
+  = help: this function's return type contains a borrowed value, but there is no value for it to be borrowed from
+help: consider using the `'static` lifetime, but this is uncommon unless you're returning a borrowed value from a `const` or a `static`
+  |
+2 | fn dangle() -> &'static String {
+  |                 +++++++
+help: instead, you are more likely to want to return an owned value
+  |
+2 - fn dangle() -> &String {
+2 + fn dangle() -> String {
+  |
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0106`.
+
+===== outlives.rs  (expected: does not compile)
+error[E0597]: `x` does not live long enough
+ --> outlives.rs:6:13
+  |
+5 |         let x = 5;
+  |             - binding `x` declared here
+6 |         r = &x;
+  |             ^^ borrowed value does not live long enough
+7 |     }
+  |     - `x` dropped here while still borrowed
+8 |     println!("r: {r}");
+  |                   - borrow later used here
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0597`.
+
+===== borrowmut.rs  (expected: does not compile)
+error[E0502]: cannot borrow `scores` as mutable because it is also borrowed as immutable
+ --> borrowmut.rs:5:5
+  |
+4 |     let first = &scores[0];
+  |                  ------ immutable borrow occurs here
+5 |     scores.push(30);
+  |     ^^^^^^^^^^^^^^^ mutable borrow occurs here
+6 |     println!("{first}");
+  |                ----- immutable borrow later used here
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0502`.
+
+===== afterinto.rs  (expected: does not compile)
+error[E0382]: borrow of moved value: `scores`
+   --> afterinto.rs:5:22
+    |
+  3 |     let scores = vec![10, 20, 30];
+    |         ------ move occurs because `scores` has type `Vec<i32>`, which does not implement the `Copy` trait
+  4 |     for s in scores.into_iter() { println!("{s}"); }
+    |                     ----------- `scores` moved due to this method call
+  5 |     println!("{:?}", scores);
+    |                      ^^^^^^ value borrowed here after move
+    |
+note: `into_iter` takes ownership of the receiver `self`, which moves `scores`
+   --> ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/collect.rs:312:18
+    |
+312 |     fn into_iter(self) -> Self::IntoIter;
+    |                  ^^^^
+help: you can `clone` the value and consume it, but this might not be your desired behavior
+    |
+  4 |     for s in scores.clone().into_iter() { println!("{s}"); }
+    |                    ++++++++
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0382`.
+
+===== boxes.rs
+size_of::<i32>()      = 4
+size_of::<Box<i32>>() = 8
+size_of::<Pair>()     = 16
+x          at 0x7fff56f77254  in [stack]
+b (handle) at 0x7fff56f77298  in [stack]
+*b (the 7) at 0x5b0dad6f8d50  in [heap]
+p          at 0x7fff56f772a0  in [stack]
+*p.score   at 0x5b0dad6f8d70  in [heap]
+7 7 1 90
+(exit status 0)
+
+===== vec.rs
+len=2 cap=2 buffer at 0x586e043d2d50
+len=3 cap=4 buffer at 0x586e043d2d50
+len=4 cap=4 buffer at 0x586e043d2d50
+w: len=2 cap=2 buffer at 0x586e043d2d70  (neighbour at 0x586e043d2d90)
+w: len=3 cap=4 buffer at 0x586e043d2d70
+w: len=4 cap=4 buffer at 0x586e043d2d70
+w: len=5 cap=8 buffer at 0x586e043d2db0
+w: len=6 cap=8 buffer at 0x586e043d2db0
+w: len=7 cap=8 buffer at 0x586e043d2db0
+empty len=0 cap=0
+s len=2 cap=2
+né len=3 chars=2 bytes=[110, 195, 169]
+size_of Vec<i32>=24 String=24 Box<i32>=8
+(exit status 0)
+
+===== moves.rs
+n=5 m=5
+a's buffer was at 0x560535b73d50; b's buffer is at 0x560535b73d50
+c's buffer is at 0x560535b73d70
+end of main
+drop second
+drop third
+drop first
+(exit status 0)
+
+===== refs.rs
+r1 holds 0x7ffc88c76968 (the Vec handle), r2 holds 0x7ffc88c76968
+&scores[0] holds 0x591bc975fd50 (inside the heap buffer)
+r1[0] + r2[1] = 30
+[10, 20, 30]
+size_of::<&Vec<i32>>() = 8
+size_of::<&[i32]>()    = 16
+size_of::<&str>()      = 16
+(exit status 0)
+
+===== sum.rs
+60
+(exit status 0)
+
+===== iterm.rs
+11
+21
+31
+owned 11
+owned 21
+owned 31
+size_of::<std::slice::Iter<i32>>()    = 16
+size_of::<std::slice::IterMut<i32>>() = 16
+size_of::<std::vec::IntoIter<i32>>()  = 32
+(exit status 0)
+
+===== threads_scope.rs
+60 60
+(exit status 0)
+
+===== index.rs
+None
+
+thread 'main' (134144) panicked at index.rs:5:21:
+index out of bounds: the len is 3 but the index is 10
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+(exit status 101)
+
+===== recurse.rs
+
+thread 'main' (134179) has overflowed its stack
+fatal runtime error: stack overflow, aborting
+Aborted (core dumped)
+(exit status 134)
+
+===== maps.rs
+thread local  0x7257644fdd3c
+main fn       0x5efa541c9050
+small buffer  0x5efa8862cd50
+big buffer    0x7257644ff010
+main local    0x7ffea8ae2acc
+5efa541b1000-5efa541c8000 r--p 00000000 00:28 22831                      maps
+5efa541c8000-5efa5420b000 r-xp 00016000 00:28 22831                      maps
+5efa5420b000-5efa5420e000 r--p 00058000 00:28 22831                      maps
+5efa5420e000-5efa54210000 rw-p 0005a000 00:28 22831                      maps
+5efa8862c000-5efa8864d000 rw-p 00000000 00:00 0                          [heap]
+725760000000-725760021000 rw-p 00000000 00:00 0 
+725760021000-725764000000 ---p 00000000 00:00 0 
+7257642fe000-7257644ff000 rw-p 00000000 00:00 0 
+7257644ff000-725764600000 rw-p 00000000 00:00 0 
+725764600000-725764628000 r--p 00000000 103:02 23076019                  /usr/lib/x86_64-linux-gnu/libc.so.6
+725764628000-7257647c0000 r-xp 00028000 103:02 23076019                  /usr/lib/x86_64-linux-gnu/libc.so.6
+7257647c0000-72576480e000 r--p 001c0000 103:02 23076019                  /usr/lib/x86_64-linux-gnu/libc.so.6
+72576480e000-725764812000 r--p 0020e000 103:02 23076019                  /usr/lib/x86_64-linux-gnu/libc.so.6
+725764812000-725764814000 rw-p 00212000 103:02 23076019                  /usr/lib/x86_64-linux-gnu/libc.so.6
+725764814000-725764821000 rw-p 00000000 00:00 0 
+7257648da000-7257648dc000 rw-p 00000000 00:00 0 
+7257648dc000-7257648e0000 r--p 00000000 103:02 23083938                  /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
+7257648e0000-725764904000 r-xp 00004000 103:02 23083938                  /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
+725764904000-725764908000 r--p 00028000 103:02 23083938                  /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
+725764908000-725764909000 r--p 0002c000 103:02 23083938                  /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
+725764909000-72576490a000 rw-p 0002d000 103:02 23083938                  /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
+725764922000-725764923000 ---p 00000000 00:00 0 
+725764923000-725764925000 rw-p 00000000 00:00 0 
+725764925000-725764926000 ---p 00000000 00:00 0 
+725764926000-725764928000 rw-p 00000000 00:00 0 
+725764928000-72576492a000 rw-p 00000000 00:00 0 
+72576492a000-72576492e000 r--p 00000000 00:00 0                          [vvar]
+72576492e000-725764930000 r--p 00000000 00:00 0                          [vvar_vclock]
+725764930000-725764932000 r-xp 00000000 00:00 0                          [vdso]
+725764932000-725764933000 r--p 00000000 103:02 23075989                  /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+725764933000-725764962000 r-xp 00001000 103:02 23075989                  /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+725764962000-72576496d000 r--p 00030000 103:02 23075989                  /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+72576496d000-72576496f000 r--p 0003b000 103:02 23075989                  /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+72576496f000-725764970000 rw-p 0003d000 103:02 23075989                  /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+725764970000-725764971000 rw-p 00000000 00:00 0 
+7ffea8ac4000-7ffea8ae6000 rw-p 00000000 00:00 0                          [stack]
+ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsyscall]
+(exit status 0)
+
+===== rss.rs
+before touching:
+75afbc7ff000-75afc0800000 rw-p 00000000 00:00 0 
+Size:              65540 kB
+Rss:                   4 kB
+
+after writing one byte per 4096:
+75afbc7ff000-75afc0800000 rw-p 00000000 00:00 0 
+Size:              65540 kB
+Rss:               65536 kB
+
+(exit status 0)
+
+===== x.rs  optimised (-O) and unoptimised assembly of compute()
+-- opt-level=3
+_RNvCsdKar8LcZp0J_1x7compute:
+	lea	eax, [rdi + rsi]
+	ret
+-- opt-level=0
+_RNvCsdKar8LcZp0J_1x7compute:
+	push	rax
+	add	edi, esi
+	mov	dword ptr [rsp + 4], edi
+	seto	al
+	jo	.LBB8_2
+	mov	eax, dword ptr [rsp + 4]
+	pop	rcx
+	ret
+
+===== calls.rs  unoptimised (-C opt-level=0): one frame per call
+_RNvCs9rTgNq7CuOb_5calls3add:
+	push	rax
+	add	edi, esi
+	mov	dword ptr [rsp + 4], edi
+	seto	al
+	jo	.LBB7_2
+	mov	eax, dword ptr [rsp + 4]
+	pop	rcx
+	ret
+_RNvCs9rTgNq7CuOb_5calls7average:
+	push	rax
+	call	_RNvCs9rTgNq7CuOb_5calls3add
+	mov	dword ptr [rsp + 4], eax
+	cmp	eax, -2147483648
+	sete	al
+	and	al, 0
+	test	al, 1
+	jne	.LBB9_2
+	mov	eax, dword ptr [rsp + 4]
+	mov	ecx, 2
+	cdq
+	idiv	ecx
+	pop	rcx
+	ret
+_RNvCs9rTgNq7CuOb_5calls4main:
+	sub	rsp, 40
+	mov	edi, 13
+	call	_RINvNtCsgxBkk5gSRhY_4core4hint9black_boxlECs9rTgNq7CuOb_5calls
+	mov	edi, eax
+	mov	esi, 7
+	call	_RNvCs9rTgNq7CuOb_5calls7average
+	mov	dword ptr [rsp + 4], eax
+	lea	rdi, [rsp + 24]
+	lea	rsi, [rsp + 4]
+	call	_RINvMNtNtCsgxBkk5gSRhY_4core3fmt2rtNtB3_8Argument11new_displaylECs9rTgNq7CuOb_5calls
+	mov	rax, qword ptr [rsp + 24]
+	mov	qword ptr [rsp + 8], rax
+	mov	rax, qword ptr [rsp + 32]
+	mov	qword ptr [rsp + 16], rax
+	lea	rdi, [rip + .Lanon.1c622c33245ba9c58f951e1b4d48e24f.3]
+	lea	rsi, [rsp + 8]
+	call	_RINvMs2_NtCsgxBkk5gSRhY_4core3fmtNtB6_9Arguments3newKj4_Kj1_ECs9rTgNq7CuOb_5calls
+	mov	rdi, rax
+	mov	rsi, rdx
+	call	qword ptr [rip + _RNvNtNtCs9k3SxhrAWiO_3std2io5stdio6__print@GOTPCREL]
+	add	rsp, 40
+	ret
+
+===== calls.rs  optimised (-O): average and add are inlined into main
+_RNvCs9rTgNq7CuOb_5calls4main:
+	sub	rsp, 24
+	mov	dword ptr [rsp], 13
+	mov	rax, rsp
+	#APP
+	#NO_APP
+	mov	eax, dword ptr [rsp]
+	mov	ecx, eax
+	add	eax, 7
+	shr	eax, 31
+	add	eax, ecx
+	add	eax, 7
+	sar	eax
+	mov	dword ptr [rsp + 4], eax
+	lea	rax, [rsp + 4]
+	mov	qword ptr [rsp + 8], rax
+	mov	rax, qword ptr [rip + _RNvXs9_NtNtNtCsgxBkk5gSRhY_4core3fmt3num3implNtB9_7Display3fmt@GOTPCREL]
+	mov	qword ptr [rsp + 16], rax
+	lea	rdi, [rip + .Lanon.1c622c33245ba9c58f951e1b4d48e24f.1]
+	lea	rsi, [rsp + 8]
+	call	qword ptr [rip + _RNvNtNtCs9k3SxhrAWiO_3std2io5stdio6__print@GOTPCREL]
+	add	rsp, 24
+	ret
+symbols named average or add in the optimised output: 0
+
+===== sum.rs  optimised (-O): main, with total() inlined
+_RNvCs17YmIFM6kcg_3sum4main:
+	push	rbx
+	sub	rsp, 48
+	call	qword ptr [rip + _RNvCs1njKG4L9aB3_7___rustc35___rust_no_alloc_shim_is_unstable_v2@GOTPCREL]
+	mov	edi, 8
+	mov	esi, 4
+	call	qword ptr [rip + _RNvCs1njKG4L9aB3_7___rustc12___rust_alloc@GOTPCREL]
+	test	rax, rax
+	je	.LBB4_9
+	movabs	rcx, 85899345930
+	mov	qword ptr [rax], rcx
+	mov	qword ptr [rsp + 8], 2
+	mov	qword ptr [rsp + 16], rax
+	mov	qword ptr [rsp + 24], 2
+	lea	rdi, [rsp + 8]
+	call	_RNvMs4_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVeclE8grow_oneCs17YmIFM6kcg_3sum
+	mov	rbx, qword ptr [rsp + 16]
+	mov	dword ptr [rbx + 8], 30
+	mov	eax, dword ptr [rbx]
+	mov	ecx, dword ptr [rbx + 4]
+	add	eax, ecx
+	add	eax, 30
+	mov	dword ptr [rsp + 4], eax
+	lea	rax, [rsp + 4]
+	mov	qword ptr [rsp + 32], rax
+	mov	rax, qword ptr [rip + _RNvXs9_NtNtNtCsgxBkk5gSRhY_4core3fmt3num3implNtB9_7Display3fmt@GOTPCREL]
+	mov	qword ptr [rsp + 40], rax
+	lea	rdi, [rip + .Lanon.744c918f5ac172218dc751f27b67a528.1]
+	lea	rsi, [rsp + 32]
+	call	qword ptr [rip + _RNvNtNtCs9k3SxhrAWiO_3std2io5stdio6__print@GOTPCREL]
+	mov	rsi, qword ptr [rsp + 8]
+	test	rsi, rsi
+	je	.LBB4_5
+	shl	rsi, 2
+	mov	edx, 4
+	mov	rdi, rbx
+	call	qword ptr [rip + _RNvCs1njKG4L9aB3_7___rustc14___rust_dealloc@GOTPCREL]
+	add	rsp, 48
+	pop	rbx
+	ret
+symbols named total in the optimised output: 0

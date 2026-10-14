@@ -1,0 +1,898 @@
+<!doctype html>
+<html lang="en" class="no-js">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Glossary — How a Rust program meets the machine</title>
+        <meta
+            name="description"
+            content="Plain definitions of every term used, with the layer each term belongs to."
+        />
+        <link rel="stylesheet" href="../assets/css/site.css" />
+        <script src="../assets/js/site.js"></script>
+        <script src="../assets/js/diagrams.js" defer></script>
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to the text</a>
+        <header class="top">
+            <a class="top__title" href="../index.html"
+                >How a Rust program meets the machine</a
+            >
+            <span class="top__here">Glossary</span>
+            <span class="top__spacer"></span>
+            <button
+                class="top__btn"
+                type="button"
+                data-toc-toggle
+                aria-expanded="false"
+                aria-controls="toc"
+            >
+                Contents
+            </button>
+        </header>
+        <div class="shell">
+            <nav class="toc" id="toc" aria-label="Contents">
+                <a class="toc__home" href="../index.html">The whole map</a>
+                <p class="toc__group">Before your code runs</p>
+                <ol>
+                    <li>
+                        <a href="../lessons/01-what-is-a-program.html"
+                            ><span class="n">01</span
+                            ><span>What a program is</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="../lessons/02-how-a-cpu-runs-code.html"
+                            ><span class="n">02</span
+                            ><span>How a CPU runs code</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="../lessons/03-programs-processes-and-the-kernel.html"
+                            ><span class="n">03</span
+                            ><span>Processes and the kernel</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Addresses</p>
+                <ol>
+                    <li>
+                        <a href="../lessons/04-virtual-memory.html"
+                            ><span class="n">04</span
+                            ><span>Inside an address space</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="../lessons/05-physical-ram-and-address-translation.html"
+                            ><span class="n">05</span
+                            ><span>From virtual address to RAM</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="../lessons/06-threads-and-their-stacks.html"
+                            ><span class="n">06</span
+                            ><span>Threads and their stacks</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="../lessons/07-registers-caches-and-a-memory-read.html"
+                            ><span class="n">07</span
+                            ><span>Caches and one load</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Calls and data</p>
+                <ol>
+                    <li>
+                        <a
+                            href="../lessons/08-function-calls-and-stack-frames.html"
+                            ><span class="n">08</span
+                            ><span>Calls and stack frames</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="../lessons/09-rust-values-stack-heap-and-box.html"
+                            ><span class="n">09</span
+                            ><span>Values, stack, heap, Box</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="../lessons/10-string-and-vec-memory.html"
+                            ><span class="n">10</span
+                            ><span>String and Vec</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Rust's rules</p>
+                <ol>
+                    <li>
+                        <a
+                            href="../lessons/11-ownership-moves-clone-and-drop.html"
+                            ><span class="n">11</span
+                            ><span>Ownership, moves, drop</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="../lessons/12-references-borrowing-and-lifetimes.html"
+                            ><span class="n">12</span
+                            ><span>References and lifetimes</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="../lessons/13-iterators-and-following-data.html"
+                            ><span class="n">13</span><span>Iterators</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="../lessons/14-memory-bugs-and-rust-safety.html"
+                            ><span class="n">14</span
+                            ><span>Memory bugs and safety</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">All together</p>
+                <ol>
+                    <li>
+                        <a
+                            href="../lessons/15-follow-one-example-end-to-end.html"
+                            ><span class="n">15</span
+                            ><span>One call, every layer</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Reference</p>
+                <ul class="toc__ref">
+                    <li>
+                        <a href="../reference/glossary.html" aria-current="page"
+                            >Glossary</a
+                        >
+                        <ol class="toc__sub">
+                            <li class="lv2">
+                                <a href="#programs-and-processes"
+                                    >Programs and processes</a
+                                >
+                            </li>
+                            <li class="lv2"><a href="#cpu">CPU</a></li>
+                            <li class="lv2">
+                                <a href="#addresses-and-memory"
+                                    >Addresses and memory</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#stack-and-heap">Stack and heap</a>
+                            </li>
+                            <li class="lv2"><a href="#rust">Rust</a></li>
+                        </ol>
+                    </li>
+                    <li><a href="../reference/sources.html">Sources</a></li>
+                    <li>
+                        <a href="../reference/concept-map.html">Concept map</a>
+                    </li>
+                </ul>
+            </nav>
+            <main id="main">
+                <article class="page">
+                    <div class="refdoc refdoc--glossary">
+                        <header class="opening">
+                            <div class="opening__meta">
+                                <span class="opening__num">Reference</span>
+                            </div>
+                            <h1>Glossary</h1>
+                        </header>
+                        <ul
+                            class="legend"
+                            aria-label="Which layer each colour means"
+                        >
+                            <li>
+                                <span class="sw sw-rust"></span>Rust language
+                            </li>
+                            <li>
+                                <span class="sw sw-comp"></span>Compiler &amp;
+                                runtime library
+                            </li>
+                            <li>
+                                <span class="sw sw-os"></span>Operating system
+                            </li>
+                            <li>
+                                <span class="sw sw-hw"></span>CPU &amp; hardware
+                            </li>
+                        </ul>
+                        <p>
+                            Each word here has one meaning, and it is used the
+                            same way everywhere. When a word means different
+                            things at different layers, both meanings are listed
+                            and the layer is named.
+                        </p>
+                        <hr />
+                        <h2 id="programs-and-processes">
+                            Programs and processes
+                        </h2>
+                        <p class="entry" id="source-code">
+                            <strong>Source code</strong> — Text a programmer
+                            writes, such as <code>main.rs</code>. The CPU never
+                            reads it.
+                        </p>
+                        <p class="entry" id="compiler">
+                            <strong>Compiler</strong>
+                            <span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            — A program that translates source code into machine
+                            code for a target. <code>rustc</code> checks the
+                            Rust rules, then hands its output to LLVM, which
+                            produces machine code. A linker joins the pieces
+                            into one executable.
+                        </p>
+                        <p class="entry" id="machine-code-instruction">
+                            <strong>Machine code / instruction</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            Bytes the CPU can decode and carry out. One
+                            instruction does a small job: add two registers,
+                            load from an address, jump, call.
+                        </p>
+                        <p class="entry" id="executable">
+                            <strong>Executable</strong>
+                            <span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            ><span class="tag tag-os">Operating system</span> —
+                            A file that holds machine code, data, and the
+                            information the OS needs to load it. On Linux the
+                            format is ELF. The ELF header records the
+                            <em>entry point</em>, the address where execution
+                            starts.
+                        </p>
+                        <p class="entry" id="program">
+                            <strong>Program</strong> — The instructions and data
+                            prepared for running, usually stored as an
+                            executable file. A program on disk does nothing by
+                            itself.
+                        </p>
+                        <p class="entry" id="process">
+                            <strong>Process</strong>
+                            <span class="tag tag-os">Operating system</span> — A
+                            running instance of a program. The kernel gives it
+                            an address space, at least one thread, and resources
+                            such as open file descriptors. Running one program
+                            twice gives two processes.
+                        </p>
+                        <p class="entry" id="kernel">
+                            <strong>Kernel</strong>
+                            <span class="tag tag-os">Operating system</span> —
+                            The part of the operating system that runs with full
+                            hardware privilege. It creates processes, sets up
+                            address spaces, schedules threads and handles
+                            faults.
+                        </p>
+                        <p class="entry" id="system-call">
+                            <strong>System call</strong>
+                            <span class="tag tag-os">Operating system</span> — A
+                            request from a process to the kernel, such as "open
+                            this file" or "map more memory". The CPU switches
+                            into the kernel to handle it, then returns.
+                        </p>
+                        <p class="entry" id="startup-code">
+                            <strong>Startup code</strong>
+                            <span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            — Code that runs after the kernel starts the process
+                            and before your <code>main</code>. For a Rust
+                            program on Linux this includes the dynamic loader,
+                            the C library's start routine, and
+                            <code>std::rt::lang_start</code>.
+                        </p>
+                        <p class="entry" id="scheduler">
+                            <strong>Scheduler</strong>
+                            <span class="tag tag-os">Operating system</span> —
+                            The part of the kernel that decides which runnable
+                            thread uses each CPU core next.
+                        </p>
+                        <p class="entry" id="thread">
+                            <strong>Thread</strong>
+                            <span class="tag tag-os">Operating system</span> —
+                            One path of execution inside a process. Each thread
+                            has its own register values (including its
+                            instruction pointer and stack pointer) and its own
+                            stack. Threads of one process share its address
+                            space.
+                        </p>
+                        <p class="entry" id="initial-thread-main-thread">
+                            <strong>Initial thread / main thread</strong>
+                            <span class="tag tag-os">Operating system</span> —
+                            The first thread of a process. Its stack is the one
+                            Linux labels <code>[stack]</code> in
+                            <code>/proc/PID/maps</code>. This is different from
+                            the function <code>main</code>.
+                        </p>
+                        <h2 id="cpu">CPU</h2>
+                        <p class="entry" id="cpu-core">
+                            <strong>CPU core</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            A unit that executes instructions. A chip often has
+                            several.
+                        </p>
+                        <p class="entry" id="register">
+                            <strong>Register</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            A small, very fast storage slot inside the core.
+                            Instructions name registers directly. Examples on
+                            x86-64: <code>rax</code>, <code>rdi</code>,
+                            <code>rsp</code>.
+                        </p>
+                        <p class="entry" id="general-purpose-register">
+                            <strong>General-purpose register</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            A register used for ordinary values and addresses.
+                        </p>
+                        <p
+                            class="entry"
+                            id="instruction-pointer-program-counter"
+                        >
+                            <strong
+                                >Instruction pointer / program counter</strong
+                            >
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            The register holding the address of the next
+                            instruction (<code>rip</code> on x86-64,
+                            <code>PC</code> on Arm).
+                        </p>
+                        <p class="entry" id="stack-pointer">
+                            <strong>Stack pointer</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            The register holding the address of the current top
+                            of the thread's stack (<code>rsp</code> on x86-64,
+                            <code>SP</code> on Arm).
+                        </p>
+                        <p class="entry" id="flags-status-register">
+                            <strong>Flags / status register</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            Bits set by instructions to record results such as
+                            "zero" or "overflowed". Later instructions can
+                            branch on them.
+                        </p>
+                        <p class="entry" id="execution-unit-alu">
+                            <strong>Execution unit / ALU</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            The circuitry that performs an operation such as an
+                            addition.
+                        </p>
+                        <p class="entry" id="fetch-decode-execute">
+                            <strong>Fetch–decode–execute</strong> — A beginner
+                            model of what a core does with each instruction.
+                            Modern cores overlap many instructions and may run
+                            them out of order. The model is still the right
+                            first picture.
+                        </p>
+                        <p class="entry" id="calling-convention-abi">
+                            <strong>Calling convention / ABI</strong>
+                            <span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            — The agreement between caller and callee about
+                            where arguments go, where the result goes, and which
+                            registers must be preserved. On x86-64 Linux,
+                            <code>extern "C"</code> functions follow the System
+                            V AMD64 ABI. Plain Rust functions use the "Rust"
+                            ABI, whose register use the Rust documentation does
+                            not spell out.
+                        </p>
+                        <p class="entry" id="inlining">
+                            <strong>Inlining</strong>
+                            <span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            — The compiler copying a function's body into its
+                            caller instead of emitting a call. An inlined
+                            function has no call, no return address and no
+                            <a
+                                href="../lessons/08-function-calls-and-stack-frames.html"
+                                >frame</a
+                            >
+                            of its own. In the optimised <code>sum.rs</code>,
+                            <code>total</code> was inlined into
+                            <code>main</code>.
+                        </p>
+                        <h2 id="addresses-and-memory">Addresses and memory</h2>
+                        <p class="entry" id="address">
+                            <strong>Address</strong> — A number that names one
+                            byte.
+                        </p>
+                        <p class="entry" id="virtual-address">
+                            <strong>Virtual address</strong>
+                            <span class="tag tag-os">Operating system</span
+                            ><span class="tag tag-hw">CPU &amp; hardware</span>
+                            — An address as used by instructions inside a
+                            process. It only means something inside that one
+                            address space.
+                        </p>
+                        <p class="entry" id="physical-address">
+                            <strong>Physical address</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            An address on the memory bus that selects real RAM.
+                        </p>
+                        <p class="entry" id="address-space">
+                            <strong>Address space</strong>
+                            <span class="tag tag-os">Operating system</span> —
+                            The full range of virtual addresses a process can
+                            use, together with the record of which ranges are
+                            mapped and with what permissions.
+                        </p>
+                        <p class="entry" id="mapping">
+                            <strong>Mapping</strong>
+                            <span class="tag tag-os">Operating system</span> — A
+                            range of virtual addresses the kernel has set up,
+                            with permissions (read, write, execute) and a
+                            backing: a file, or anonymous zero-filled memory.
+                            Listed one per line in <code>/proc/PID/maps</code>.
+                        </p>
+                        <p class="entry" id="anonymous-mapping">
+                            <strong>Anonymous mapping</strong>
+                            <span class="tag tag-os">Operating system</span> — A
+                            mapping not backed by a file. Its pages start out as
+                            zeros.
+                        </p>
+                        <p class="entry" id="virtual-page">
+                            <strong>Virtual page</strong>
+                            <span class="tag tag-os">Operating system</span
+                            ><span class="tag tag-hw">CPU &amp; hardware</span>
+                            — A fixed-size block of virtual addresses. Mappings
+                            are made in whole pages.
+                        </p>
+                        <p class="entry" id="physical-page-frame">
+                            <strong>Physical page frame</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span
+                            ><span class="tag tag-os">Operating system</span> —
+                            A page-sized block of physical RAM. A virtual page
+                            is mapped to a frame, not the other way round: the
+                            same frame can back pages in several processes.
+                        </p>
+                        <p class="entry" id="page-size">
+                            <strong>Page size</strong> — The size of a page.
+                            4096 bytes is common (it is the size on the machine
+                            the examples were run on). Arm also supports 16 KiB
+                            and 64 KiB granules, and both architectures support
+                            larger "huge" pages.
+                        </p>
+                        <p class="entry" id="page-offset">
+                            <strong>Page offset</strong> — The low bits of an
+                            address: which byte inside the page. Translation
+                            does not change it.
+                        </p>
+                        <p class="entry" id="virtual-page-number-vpn">
+                            <strong>Virtual page number (VPN)</strong> — The
+                            high bits of a virtual address: which page.
+                        </p>
+                        <p class="entry" id="page-table">
+                            <strong>Page table</strong>
+                            <span class="tag tag-os">Operating system</span
+                            ><span class="tag tag-hw">CPU &amp; hardware</span>
+                            — A data structure in memory, written by the kernel
+                            and read by the MMU, that records for each virtual
+                            page whether it is mapped, which frame backs it, and
+                            what access is allowed. Real page tables have
+                            several levels.
+                        </p>
+                        <p class="entry" id="page-table-entry-pte">
+                            <strong>Page table entry (PTE)</strong> — One row of
+                            a page table: frame number plus bits such as
+                            valid/present, writable, executable.
+                        </p>
+                        <p class="entry" id="mmu-memory-management-unit">
+                            <strong>MMU (memory management unit)</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            Hardware in the CPU that translates each virtual
+                            address to a physical address and checks
+                            permissions.
+                        </p>
+                        <p class="entry" id="tlb-translation-lookaside-buffer">
+                            <strong>TLB (translation lookaside buffer)</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            A small cache inside the MMU that holds recent
+                            <em>translations</em> (page → frame). It does not
+                            hold data. A <em>TLB miss</em> means the hardware
+                            must walk the page table.
+                        </p>
+                        <p class="entry" id="page-fault">
+                            <strong>Page fault</strong> [HW→OS] — The exception
+                            the MMU raises when a translation is missing or
+                            forbidden. The kernel then decides. Often the access
+                            is legal and the kernel fixes it (allocates a zeroed
+                            page, reads from a file or swap) and the instruction
+                            is retried. If the address is not part of any
+                            mapping, or the access breaks the permissions, the
+                            kernel sends the process <code>SIGSEGV</code>.
+                        </p>
+                        <p class="entry" id="demand-paging">
+                            <strong>Demand paging</strong>
+                            <span class="tag tag-os">Operating system</span> —
+                            Giving a mapped page physical memory only when it is
+                            first used.
+                        </p>
+                        <p class="entry" id="resident">
+                            <strong>Resident</strong>
+                            <span class="tag tag-os">Operating system</span> —
+                            Currently backed by a physical frame. The
+                            <code>Rss</code> field in
+                            <code>/proc/PID/smaps</code> counts resident memory.
+                        </p>
+                        <p class="entry" id="swap">
+                            <strong>Swap</strong>
+                            <span class="tag tag-os">Operating system</span> —
+                            Disk space the kernel can move anonymous pages to
+                            when RAM is short.
+                        </p>
+                        <p class="entry" id="ram-dram">
+                            <strong>RAM / DRAM</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            Main memory. Much larger and much slower than the
+                            CPU's caches.
+                        </p>
+                        <p class="entry" id="cache-cpu-cache">
+                            <strong>Cache (CPU cache)</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            Small, fast memory in the CPU that holds copies of
+                            recently used memory, in fixed-size
+                            <em>cache lines</em> (64 bytes on the machine used
+                            here). L1 is smallest and fastest; L2 and L3 are
+                            larger and slower. Which levels exist, their sizes
+                            and which cores share them differ between CPUs.
+                        </p>
+                        <p class="entry" id="cache-hit-miss">
+                            <strong>Cache hit / miss</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            Whether the requested line was found in a given
+                            cache.
+                        </p>
+                        <p class="entry" id="cache-line">
+                            <strong>Cache line</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span> —
+                            The fixed-size block in which caches store and move
+                            memory. A whole line is brought in when any byte of
+                            it is needed. 64 bytes on the machine the examples
+                            were run on; other CPUs can differ.
+                        </p>
+                        <h2 id="stack-and-heap">Stack and heap</h2>
+                        <p class="entry" id="call-stack-stack">
+                            <strong>Call stack (stack)</strong>
+                            <span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            ><span class="tag tag-os">Operating system</span> —
+                            A region of a thread's memory used last-in-first-out
+                            for function calls. Each active call can have a
+                            <em>stack frame</em> there. Each thread has its own.
+                        </p>
+                        <p class="entry" id="stack-frame">
+                            <strong>Stack frame</strong>
+                            <span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            — The part of the stack used by one active call:
+                            perhaps a return address, saved registers, and slots
+                            for locals that need memory. Its layout is chosen by
+                            the compiler and the ABI.
+                        </p>
+                        <p class="entry" id="return-address">
+                            <strong>Return address</strong>
+                            <span class="tag tag-hw">CPU &amp; hardware</span
+                            ><span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            — The address of the instruction to continue at
+                            after a call returns. On x86-64
+                            <code>call</code> pushes it on the stack and
+                            <code>ret</code> pops it.
+                        </p>
+                        <p class="entry" id="heap-allocation-sense">
+                            <strong>Heap (allocation sense)</strong>
+                            <span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            ><span class="tag tag-os">Operating system</span> —
+                            Memory obtained at run time from an allocator, in
+                            any size, and kept until it is explicitly freed. Not
+                            the heap data structure.
+                        </p>
+                        <p class="entry" id="heap-map-label">
+                            <strong><code>[heap]</code> (map label)</strong>
+                            <span class="tag tag-os">Operating system</span> —
+                            On Linux, the specific mapping grown with
+                            <code>brk</code>/<code>sbrk</code>. An allocator may
+                            also hand out memory from other anonymous mappings,
+                            so a heap allocation is not always inside
+                            <code>[heap]</code>.
+                        </p>
+                        <p class="entry" id="allocator">
+                            <strong>Allocator</strong>
+                            <span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            — The code that hands out and takes back heap
+                            memory. <code>Box</code>, <code>Vec</code> and
+                            <code>String</code> use Rust's
+                            <em>global allocator</em>. The standard library says
+                            the default one is unspecified. On the Linux machine
+                            the examples were run on, its behaviour matches the
+                            C library's <code>malloc</code>, which gets memory
+                            from the kernel with <code>brk</code> (the
+                            <code>[heap]</code> mapping) or, for large blocks,
+                            <code>mmap</code>.
+                        </p>
+                        <p class="entry" id="allocation">
+                            <strong>Allocation</strong> — One block obtained
+                            from an allocator. Freeing it gives it back to the
+                            allocator, which may or may not give memory back to
+                            the kernel.
+                        </p>
+                        <p class="entry" id="stack-overflow">
+                            <strong>Stack overflow</strong> — A thread's stack
+                            running out of room, usually from very deep or
+                            endless recursion.
+                        </p>
+                        <p class="entry" id="guard-page">
+                            <strong>Guard page</strong>
+                            <span class="tag tag-os">Operating system</span> —
+                            Memory next to a stack that is deliberately left
+                            unmapped, so running off the end of the stack causes
+                            a fault instead of silently writing into other
+                            memory. Rust's standard library recognises such a
+                            fault and reports a
+                            <a
+                                href="../lessons/14-memory-bugs-and-rust-safety.html"
+                                >stack overflow</a
+                            >.
+                        </p>
+                        <h2 id="rust">Rust</h2>
+                        <p class="entry" id="binding-variable">
+                            <strong>Binding / variable</strong>
+                            <span class="tag tag-rust">Rust</span> — A name in
+                            source code, such as <code>scores</code>. It exists
+                            at compile time. At run time there may or may not be
+                            a memory location for it.
+                        </p>
+                        <p class="entry" id="value">
+                            <strong>Value</strong>
+                            <span class="tag tag-rust">Rust</span> — The thing a
+                            binding holds: <code>7</code>, or a
+                            <code>Vec</code> handle.
+                        </p>
+                        <p class="entry" id="type">
+                            <strong>Type</strong>
+                            <span class="tag tag-rust">Rust</span> — What a
+                            value is and how big it is, such as
+                            <code>i32</code> (4 bytes) or
+                            <code>Vec&lt;i32&gt;</code>.
+                        </p>
+                        <p class="entry" id="owner">
+                            <strong>Owner</strong>
+                            <span class="tag tag-rust">Rust</span> — The binding
+                            (or containing value) responsible for a value. Each
+                            value has exactly one owner at a time.
+                        </p>
+                        <p class="entry" id="drop">
+                            <strong>Drop</strong>
+                            <span class="tag tag-rust">Rust</span
+                            ><span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            — Running a value's cleanup code when its owner goes
+                            out of scope. For <code>Box</code>,
+                            <code>Vec</code> and <code>String</code>, dropping
+                            frees their heap allocation.
+                        </p>
+                        <p class="entry" id="move">
+                            <strong>Move</strong>
+                            <span class="tag tag-rust">Rust</span> —
+                            Transferring ownership. The bytes of the handle are
+                            copied to the new place, and the old binding can no
+                            longer be used. Heap contents are not copied.
+                        </p>
+                        <p class="entry" id="copy">
+                            <strong><code>Copy</code></strong>
+                            <span class="tag tag-rust">Rust</span> — A marker
+                            for types (integers, <code>bool</code>,
+                            <code>char</code>, <code>f64</code>, …) whose values
+                            are duplicated on assignment; the old binding stays
+                            usable.
+                        </p>
+                        <p class="entry" id="clone">
+                            <strong><code>Clone</code></strong>
+                            <span class="tag tag-rust">Rust</span> — An explicit
+                            call (<code>.clone()</code>) that creates an
+                            independent value. For <code>String</code> this
+                            means a new allocation with the same bytes.
+                        </p>
+                        <p class="entry" id="handle">
+                            <strong>Handle</strong> — The fixed-size part of a
+                            <code>Box</code>, <code>Vec</code> or
+                            <code>String</code>: a pointer (and for
+                            <code>Vec</code>/<code>String</code>, a length and
+                            capacity). It is a value like any other. The data it
+                            points to is a separate allocation.
+                        </p>
+                        <p class="entry" id="box-t">
+                            <strong><code>Box&lt;T&gt;</code></strong>
+                            <span class="tag tag-rust">Rust</span
+                            ><span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            — A pointer that owns one <code>T</code> stored in a
+                            heap allocation and frees it when dropped.
+                        </p>
+                        <p class="entry" id="vec-t">
+                            <strong><code>Vec&lt;T&gt;</code></strong>
+                            <span class="tag tag-rust">Rust</span
+                            ><span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            — A growable list of <code>T</code> kept
+                            contiguously in one heap buffer. Its handle is a
+                            (pointer, capacity, length) triplet; the order of
+                            those fields is unspecified.
+                        </p>
+                        <p class="entry" id="length">
+                            <strong>Length</strong> — How many elements a
+                            <code>Vec</code> holds now. For a
+                            <code>String</code>, how many <em>bytes</em>.
+                        </p>
+                        <p class="entry" id="capacity">
+                            <strong>Capacity</strong> — How many elements a
+                            <code>Vec</code> can hold before it must reallocate.
+                            For a <code>String</code>, in bytes.
+                        </p>
+                        <p class="entry" id="reallocation">
+                            <strong>Reallocation</strong> — Getting a bigger
+                            buffer, moving the elements into it, and freeing the
+                            old one. The elements' addresses change.
+                        </p>
+                        <p class="entry" id="string">
+                            <strong><code>String</code></strong>
+                            <span class="tag tag-rust">Rust</span
+                            ><span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            — A growable, owned, UTF-8 string. Same shape as a
+                            <code>Vec&lt;u8&gt;</code>.
+                        </p>
+                        <p class="entry" id="str-string-literal">
+                            <strong
+                                ><code>&amp;str</code> / string literal</strong
+                            >
+                            <span class="tag tag-rust">Rust</span> — A borrowed
+                            view of UTF-8 bytes. A literal such as
+                            <code>"hi"</code> is a
+                            <code>&amp;'static str</code> pointing into the
+                            executable's read-only data; it allocates nothing.
+                        </p>
+                        <p class="entry" id="reference">
+                            <strong>Reference</strong>
+                            <span class="tag tag-rust">Rust</span> — A value
+                            that lets code reach another value without owning
+                            it. <code>&amp;T</code> is a shared reference;
+                            <code>&amp;mut T</code> is a mutable (exclusive)
+                            reference. At run time it is an address.
+                        </p>
+                        <p class="entry" id="slice">
+                            <strong>Slice</strong>
+                            <span class="tag tag-rust">Rust</span> — A view of a
+                            run of elements stored next to each other, such as
+                            part or all of a <code>Vec</code>'s buffer. A
+                            reference to a slice, <code>&amp;[T]</code>, carries
+                            an address and a length (16 bytes on x86-64).
+                        </p>
+                        <p class="entry" id="borrow">
+                            <strong>Borrow</strong>
+                            <span class="tag tag-rust">Rust</span> — Creating a
+                            reference. The borrow lasts from where the reference
+                            is made to its last use.
+                        </p>
+                        <p class="entry" id="lifetime">
+                            <strong>Lifetime</strong>
+                            <span class="tag tag-rust">Rust</span> — The stretch
+                            of the program over which a reference must stay
+                            valid. A lifetime annotation (<code>'a</code>) names
+                            a relationship between references so the compiler
+                            can check it. It changes nothing at run time.
+                        </p>
+                        <p class="entry" id="borrow-checker">
+                            <strong>Borrow checker</strong>
+                            <span class="tag tag-rust">Rust</span
+                            ><span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            — The part of <code>rustc</code> that checks
+                            ownership and borrowing rules. It runs at compile
+                            time.
+                        </p>
+                        <p class="entry" id="iterator">
+                            <strong>Iterator</strong>
+                            <span class="tag tag-rust">Rust</span> — A value
+                            with a <code>next</code> method that yields one item
+                            at a time. It is separate from the collection it
+                            walks.
+                        </p>
+                        <p class="entry" id="panic">
+                            <strong>Panic</strong>
+                            <span class="tag tag-rust">Rust</span> — An orderly
+                            failure: the thread stops (usually unwinding and
+                            running drops) and reports a message. Not memory
+                            corruption.
+                        </p>
+                        <p class="entry" id="undefined-behaviour-ub">
+                            <strong>Undefined behaviour (UB)</strong>
+                            <span class="tag tag-rust">Rust</span> — Behaviour
+                            the language gives no meaning to, such as reading
+                            through a dangling pointer. Once it happens, the
+                            program may do anything. Safe Rust cannot cause it;
+                            <code>unsafe</code> code must avoid it by hand.
+                        </p>
+                        <p class="entry" id="unsafe">
+                            <strong><code>unsafe</code></strong>
+                            <span class="tag tag-rust">Rust</span> — A block or
+                            function in which the programmer, not the compiler,
+                            promises certain rules hold (for example, that a raw
+                            pointer is valid).
+                        </p>
+                        <p class="entry" id="raw-pointer">
+                            <strong>Raw pointer</strong>
+                            <span class="tag tag-rust">Rust</span> —
+                            <code>*const T</code> or <code>*mut T</code>: an
+                            address with none of a reference's rules. Creating
+                            one is safe; reading or writing through one requires
+                            <code>unsafe</code>, and the compiler no longer
+                            checks that it points to a live value.
+                        </p>
+                        <p class="entry" id="dangling-pointer-reference">
+                            <strong>Dangling pointer / reference</strong> — A
+                            pointer to memory that is no longer a live
+                            allocation of the expected value.
+                        </p>
+                        <p class="entry" id="send-sync">
+                            <strong
+                                ><code>Send</code> / <code>Sync</code></strong
+                            >
+                            <span class="tag tag-rust">Rust</span> — Marker
+                            traits. <code>Send</code>: safe to move to another
+                            thread. <code>Sync</code>: safe to share
+                            <code>&amp;T</code> between threads.
+                        </p>
+                    </div>
+                </article>
+                <footer class="foot">
+                    <p>
+                        Observed values, such as addresses, sizes, assembly and
+                        program output, come from one machine. It runs Linux 7.0
+                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
+                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
+                        limit. Addresses change on every run, and other systems,
+                        toolchains and allocators can differ. Details:
+                        <a href="../reference/sources.html">Sources</a> ·
+                        <code>examples/OUTPUT.txt</code>.
+                    </p>
+                </footer>
+            </main>
+            <nav class="otp" aria-label="On this page">
+                <p class="otp__h">On this page</p>
+                <ol class="otp__list">
+                    <li class="lv2">
+                        <a href="#programs-and-processes"
+                            >Programs and processes</a
+                        >
+                    </li>
+                    <li class="lv2"><a href="#cpu">CPU</a></li>
+                    <li class="lv2">
+                        <a href="#addresses-and-memory">Addresses and memory</a>
+                    </li>
+                    <li class="lv2">
+                        <a href="#stack-and-heap">Stack and heap</a>
+                    </li>
+                    <li class="lv2"><a href="#rust">Rust</a></li>
+                </ol>
+            </nav>
+        </div>
+    </body>
+</html>

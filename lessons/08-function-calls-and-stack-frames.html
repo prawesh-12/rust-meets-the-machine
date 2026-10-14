@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="en" class="no-js">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>
+            What happens on the stack when one function calls another? — How a
+            Rust program meets the machine
+        </title>
+        <meta
+            name="description"
+            content="What happens on one thread&#x27;s stack when main calls average, average calls add, and both return: frames, return addresses, which values get stack slots, and what an optimised build does instead."
+        />
+        <link rel="stylesheet" href="../assets/css/site.css" />
+        <script src="../assets/js/site.js"></script>
+        <script src="../assets/js/diagrams.js" defer></script>
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to the text</a>
+        <header class="top">
+            <a class="top__title" href="../index.html"
+                >How a Rust program meets the machine</a
+            >
+            <span class="top__here">08 · Calls and stack frames</span>
+            <span class="top__spacer"></span>
+            <button
+                class="top__btn"
+                type="button"
+                data-toc-toggle
+                aria-expanded="false"
+                aria-controls="toc"
+            >
+                Contents
+            </button>
+        </header>
+        <div class="shell">
+            <nav class="toc" id="toc" aria-label="Contents">
+                <a class="toc__home" href="../index.html">The whole map</a>
+                <p class="toc__group">Before your code runs</p>
+                <ol>
+                    <li>
+                        <a href="01-what-is-a-program.html"
+                            ><span class="n">01</span
+                            ><span>What a program is</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="02-how-a-cpu-runs-code.html"
+                            ><span class="n">02</span
+                            ><span>How a CPU runs code</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="03-programs-processes-and-the-kernel.html"
+                            ><span class="n">03</span
+                            ><span>Processes and the kernel</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Addresses</p>
+                <ol>
+                    <li>
+                        <a href="04-virtual-memory.html"
+                            ><span class="n">04</span
+                            ><span>Inside an address space</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="05-physical-ram-and-address-translation.html"
+                            ><span class="n">05</span
+                            ><span>From virtual address to RAM</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="06-threads-and-their-stacks.html"
+                            ><span class="n">06</span
+                            ><span>Threads and their stacks</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="07-registers-caches-and-a-memory-read.html"
+                            ><span class="n">07</span
+                            ><span>Caches and one load</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Calls and data</p>
+                <ol>
+                    <li>
+                        <a
+                            href="08-function-calls-and-stack-frames.html"
+                            aria-current="page"
+                            ><span class="n">08</span
+                            ><span>Calls and stack frames</span></a
+                        >
+                        <ol class="toc__sub">
+                            <li class="lv2">
+                                <a href="#what-the-compiler-actually-produced"
+                                    >What the compiler actually produced</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#frames-are-not-ownership"
+                                    >Frames are not ownership</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#returning-does-not-clear-anything"
+                                    >Returning does not clear anything</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#recursion-is-the-same-thing-repeated"
+                                    >Recursion is the same thing, repeated</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#keep-h">What to remember</a>
+                            </li>
+                            <li class="lv2">
+                                <a href="#test-h">Check your understanding</a>
+                            </li>
+                        </ol>
+                    </li>
+                    <li>
+                        <a href="09-rust-values-stack-heap-and-box.html"
+                            ><span class="n">09</span
+                            ><span>Values, stack, heap, Box</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="10-string-and-vec-memory.html"
+                            ><span class="n">10</span
+                            ><span>String and Vec</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Rust's rules</p>
+                <ol>
+                    <li>
+                        <a href="11-ownership-moves-clone-and-drop.html"
+                            ><span class="n">11</span
+                            ><span>Ownership, moves, drop</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            ><span class="n">12</span
+                            ><span>References and lifetimes</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="13-iterators-and-following-data.html"
+                            ><span class="n">13</span><span>Iterators</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="14-memory-bugs-and-rust-safety.html"
+                            ><span class="n">14</span
+                            ><span>Memory bugs and safety</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">All together</p>
+                <ol>
+                    <li>
+                        <a href="15-follow-one-example-end-to-end.html"
+                            ><span class="n">15</span
+                            ><span>One call, every layer</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Reference</p>
+                <ul class="toc__ref">
+                    <li><a href="../reference/glossary.html">Glossary</a></li>
+                    <li><a href="../reference/sources.html">Sources</a></li>
+                    <li>
+                        <a href="../reference/concept-map.html">Concept map</a>
+                    </li>
+                </ul>
+            </nav>
+            <main id="main">
+                <article class="page">
+                    <header class="opening">
+                        <div class="opening__meta">
+                            <span class="opening__num">08</span
+                            ><span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                            <span class="tag tag-hw">CPU &amp; hardware</span>
+                        </div>
+                        <h1>
+                            What happens on the stack when one function calls
+                            another?
+                        </h1>
+                        <p class="why">
+                            Every thread has its own
+                            <a href="06-threads-and-their-stacks.html">stack</a
+                            >, and the
+                            <a href="02-how-a-cpu-runs-code.html"
+                                ><code>call</code> and <code>ret</code></a
+                            >
+                            instructions move its stack pointer. While functions
+                            call each other, the stack holds one record, a
+                            frame, for every call that has not returned yet.
+                            Some values live inside those frames; others only
+                            point somewhere else.
+                        </p>
+                    </header>
+                    <ul
+                        class="legend"
+                        aria-label="Which layer each colour means"
+                    >
+                        <li><span class="sw sw-rust"></span>Rust language</li>
+                        <li>
+                            <span class="sw sw-comp"></span>Compiler &amp;
+                            runtime library
+                        </li>
+                        <li><span class="sw sw-os"></span>Operating system</li>
+                        <li>
+                            <span class="sw sw-hw"></span>CPU &amp; hardware
+                        </li>
+                    </ul>
+                    <div class="codeblock">
+                        <div class="codeblock__label">
+                            <span><code>examples/calls.rs</code></span
+                            ><span>prints <code>10</code></span>
+                        </div>
+                        <pre><code><span class="k">fn</span> add(a: i32, b: i32) -&gt; i32 {
+    a + b
+}
+
+<span class="k">fn</span> average(x: i32, y: i32) -&gt; i32 {
+    <span class="k">let</span> s = add(x, y);
+    s / 2
+}
+
+<span class="k">fn</span> main() {
+    <span class="k">let</span> x = std::hint::black_box(13);   <span class="c">// stops the compiler from computing the answer in advance</span>
+    <span class="k">let</span> m = average(x, 7);
+    println!(<span class="k">"{m}"</span>);
+}</code></pre>
+                    </div>
+                    <p>
+                        Each time a function is called, it gets a
+                        <span class="term">stack frame</span>: a block of the
+                        thread's stack for the things that call needs to keep
+                        while it runs. Together the frames form the thread's
+                        <a
+                            href="https://en.wikipedia.org/wiki/Call_stack"
+                            class="ext"
+                            >call stack</a
+                        >. Giving out memory by moving one pointer like this is
+                        called
+                        <a
+                            href="https://en.wikipedia.org/wiki/Stack-based_memory_allocation"
+                            class="ext"
+                            >stack-based allocation</a
+                        >. A frame can hold:
+                    </p>
+                    <ul>
+                        <li>
+                            the <b>return address</b>: where to continue in the
+                            caller once this call finishes;
+                        </li>
+                        <li>
+                            <b>local values</b> that the compiler decided to
+                            keep in memory rather than in registers;
+                        </li>
+                        <li>
+                            saved copies of registers the function needs to
+                            reuse, and padding to keep the stack aligned.
+                        </li>
+                    </ul>
+                    <p>
+                        Calls nest, so frames nest. The newest frame is always
+                        the one that finishes first:
+                        <a
+                            href="https://en.wikipedia.org/wiki/Stack_(abstract_data_type)"
+                            class="ext"
+                            >last in, first out</a
+                        >. On x86-64 the stack grows towards lower addresses, so
+                        in the picture new frames appear <em>below</em> older
+                        ones
+                        <a
+                            class="src"
+                            href="https://gitlab.com/x86-psABIs/x86-64-ABI"
+                            >System V psABI §3.2</a
+                        >.
+                    </p>
+
+                    <figure
+                        class="fig"
+                        data-fig="calls"
+                        data-label="call stack diagram"
+                        data-play
+                    >
+                        <div class="fig__head">
+                            <p class="fig__title">
+                                One thread's stack while
+                                <code>main → average → add</code> runs and
+                                returns
+                            </p>
+                            <span class="fig__kind"
+                                >Read from this debug build · not a general ABI
+                                layout</span
+                            >
+                        </div>
+                        <div class="fig__grid fig__grid--note">
+                            <div class="fig__body">
+                                <div class="callstack">
+                                    <pre
+                                        class="src-lines"
+                                    ><code><span class="ln"><span class="k">fn</span> add(a: i32, b: i32) -&gt; i32 {</span><span class="ln" data-now="3">    a + b</span><span class="ln" data-now="4">}</span><span class="ln"> </span><span class="ln"><span class="k">fn</span> average(x: i32, y: i32) -&gt; i32 {</span><span class="ln" data-now="2 4">    <span class="k">let</span> s = add(x, y);</span><span class="ln" data-now="5">    s / 2</span><span class="ln">}</span><span class="ln"> </span><span class="ln"><span class="k">fn</span> main() {</span><span class="ln" data-now="0">    <span class="k">let</span> x = black_box(13);</span><span class="ln" data-now="1 5">    <span class="k">let</span> m = average(x, 7);</span><span class="ln" data-now="6">    println!(<span class="k">"{m}"</span>);</span><span class="ln">}</span></code></pre>
+
+                                    <div>
+                                        <div class="stack1__h">
+                                            Main thread's stack
+                                            <span>higher addresses ↑</span>
+                                        </div>
+                                        <div class="stack1">
+                                            <div class="frm" data-now="0 5">
+                                                <div class="frm__h">
+                                                    main
+                                                    <small
+                                                        >48 bytes
+                                                        <span
+                                                            class="rspm"
+                                                            data-only="0 5"
+                                                            >← rsp</span
+                                                        ></small
+                                                    >
+                                                </div>
+                                                <div class="slot ret">
+                                                    <span
+                                                        >return address →
+                                                        <code
+                                                            >lang_start</code
+                                                        ></span
+                                                    ><i>8 B</i>
+                                                </div>
+                                                <div class="slot">
+                                                    <span
+                                                        ><code>[rsp+4]</code>
+                                                        m</span
+                                                    ><i
+                                                        data-vals='["—","—","—","—","—","10"]'
+                                                        >10</i
+                                                    >
+                                                </div>
+                                                <div class="slot">
+                                                    <span
+                                                        ><code>[rsp+8…]</code>
+                                                        for
+                                                        <code
+                                                            >println!</code
+                                                        ></span
+                                                    ><i
+                                                        data-vals='["—","—","—","—","—","—","set"]'
+                                                        >set</i
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="frm"
+                                                data-only="1 2 3 4 5"
+                                                data-now="1 4"
+                                                data-cls='{"5":"is-done"}'
+                                            >
+                                                <div class="frm__h">
+                                                    average
+                                                    <small
+                                                        >16 bytes
+                                                        <span
+                                                            class="rspm"
+                                                            data-only="1 4"
+                                                            >← rsp</span
+                                                        ></small
+                                                    >
+                                                </div>
+                                                <div class="slot ret">
+                                                    <span
+                                                        >return address →
+                                                        <code>main</code></span
+                                                    ><i>8 B</i>
+                                                </div>
+                                                <div class="slot">
+                                                    <span
+                                                        ><code>[rsp+4]</code>
+                                                        s</span
+                                                    ><i
+                                                        data-vals='["—","—","—","—","20"]'
+                                                        >20</i
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="frm"
+                                                data-only="2 3 4 5"
+                                                data-now="2 3"
+                                                data-cls='{"4":"is-done"}'
+                                            >
+                                                <div class="frm__h">
+                                                    add
+                                                    <small
+                                                        >16 bytes
+                                                        <span
+                                                            class="rspm"
+                                                            data-only="2 3"
+                                                            >← rsp</span
+                                                        ></small
+                                                    >
+                                                </div>
+                                                <div class="slot ret">
+                                                    <span
+                                                        >return address →
+                                                        <code
+                                                            >average</code
+                                                        ></span
+                                                    ><i>8 B</i>
+                                                </div>
+                                                <div class="slot">
+                                                    <span
+                                                        ><code>[rsp+4]</code> a
+                                                        + b</span
+                                                    ><i
+                                                        data-vals='["—","—","—","20"]'
+                                                        >20</i
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="frm frm--std"
+                                                data-only="6"
+                                                data-now="6"
+                                            >
+                                                <div class="frm__h">
+                                                    std's printing code
+                                                    <small
+                                                        >several frames
+                                                        <span class="rspm"
+                                                            >← rsp</span
+                                                        ></small
+                                                    >
+                                                </div>
+                                                <div class="slot">
+                                                    <span
+                                                        >the same bytes
+                                                        <code>average</code> and
+                                                        <code>add</code> used,
+                                                        now overwritten</span
+                                                    ><i></i>
+                                                </div>
+                                            </div>
+                                            <div class="stack1__end">
+                                                free stack space ↓ (lower
+                                                addresses)
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="live">
+                                        <h5>
+                                            Values in use now, and where they
+                                            are
+                                        </h5>
+                                        <ul>
+                                            <li data-only="0">
+                                                x = 13
+                                                <span
+                                                    >register
+                                                    <code>eax</code></span
+                                                >
+                                            </li>
+                                            <li data-only="1">
+                                                x = 13
+                                                <span><code>edi</code></span>
+                                            </li>
+                                            <li data-only="1">
+                                                y = 7
+                                                <span><code>esi</code></span>
+                                            </li>
+                                            <li data-only="2 3">
+                                                a = 13
+                                                <span><code>edi</code></span>
+                                            </li>
+                                            <li data-only="2 3">
+                                                b = 7
+                                                <span><code>esi</code></span>
+                                            </li>
+                                            <li data-only="3">
+                                                a + b = 20
+                                                <span
+                                                    >add's slot, then
+                                                    <code>eax</code></span
+                                                >
+                                            </li>
+                                            <li data-only="4">
+                                                s = 20
+                                                <span>average's slot</span>
+                                            </li>
+                                            <li data-only="5">
+                                                s / 2 = 10
+                                                <span><code>eax</code></span>
+                                            </li>
+                                            <li data-only="5 6">
+                                                m = 10 <span>main's slot</span>
+                                            </li>
+                                        </ul>
+                                        <p
+                                            class="note-sm"
+                                            style="margin-top: 0.6rem"
+                                        >
+                                            None of <code>x</code>,
+                                            <code>y</code>, <code>a</code> or
+                                            <code>b</code> ever gets a stack
+                                            slot here. They arrive in registers
+                                            and are used from there.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div
+                                    class="controls"
+                                    data-stepper-controls
+                                ></div>
+                                <p class="now-says" aria-live="polite"></p>
+                                <ol class="steps">
+                                    <li>
+                                        <code>main</code> is running in its own
+                                        40-byte frame.
+                                        <code>black_box</code> returns 13 in
+                                        register <code>eax</code>.
+                                    </li>
+                                    <li>
+                                        <code>main</code> puts the arguments in
+                                        registers (<code>edi</code> = 13,
+                                        <code>esi</code> = 7) and executes
+                                        <code>call average</code>, which pushes
+                                        the return address.
+                                        <code>average</code> starts with
+                                        <code>push rax</code>, reserving 8 more
+                                        bytes.
+                                    </li>
+                                    <li>
+                                        <code>average</code> calls
+                                        <code>add</code>. The arguments are
+                                        already in <code>edi</code> and
+                                        <code>esi</code>, so nothing is copied.
+                                        A second return address goes on the
+                                        stack, and <code>add</code> reserves its
+                                        own 8 bytes.
+                                    </li>
+                                    <li>
+                                        <code>add</code> computes 13 + 7 = 20,
+                                        stores it in its slot, checks for
+                                        overflow (debug builds do), and leaves
+                                        20 in <code>eax</code>.
+                                    </li>
+                                    <li>
+                                        <code>add</code> returns:
+                                        <code>pop</code> and
+                                        <code>ret</code> move
+                                        <code>rsp</code> back up and jump to the
+                                        saved return address. The frame is no
+                                        longer in use, but nothing erased it:
+                                        the 20 is still in those bytes.
+                                        <code>average</code> stores the result
+                                        as <code>s</code>.
+                                    </li>
+                                    <li>
+                                        <code>average</code> computes 20 / 2 =
+                                        10 in <code>eax</code> and returns. Its
+                                        frame is out of use too.
+                                        <code>main</code> stores 10 as
+                                        <code>m</code> in its own frame.
+                                    </li>
+                                    <li>
+                                        <code>println!</code> calls into the
+                                        standard library. Those calls push new
+                                        frames into the same addresses,
+                                        overwriting what
+                                        <code>average</code> and
+                                        <code>add</code> left behind.
+                                    </li>
+                                </ol>
+                            </div>
+                            <aside class="leaves-out">
+                                <h4>What this picture leaves out</h4>
+                                <ul>
+                                    <li>
+                                        Real addresses. The frames are drawn in
+                                        order, not to scale.
+                                    </li>
+                                    <li>
+                                        The frames above <code>main</code>:
+                                        <code>lang_start</code>, the C library's
+                                        start-up code and <code>_start</code>,
+                                        all from the
+                                        <a href="01-what-is-a-program.html"
+                                            >start-up chain</a
+                                        >.
+                                    </li>
+                                    <li>
+                                        Unwinding information and frame
+                                        pointers. This build does not keep a
+                                        frame-pointer register, which is common
+                                        on x86-64.
+                                    </li>
+                                    <li>
+                                        The overflow check in
+                                        <code>add</code> and the division check
+                                        in <code>average</code>; both are in the
+                                        assembly below.
+                                    </li>
+                                    <li>
+                                        This is the debug build. The optimised
+                                        build has no <code>average</code> or
+                                        <code>add</code> frames at all.
+                                    </li>
+                                </ul>
+                            </aside>
+                        </div>
+                    </figure>
+
+                    <h2 id="what-the-compiler-actually-produced">
+                        What the compiler actually produced
+                    </h2>
+                    <p>
+                        The picture is read from the debug build's assembly
+                        (<code>-C opt-level=0</code>). Here are the two small
+                        functions, from <code>examples/OUTPUT.txt</code>
+                        <span class="tag tag-comp">Compiler</span>:
+                    </p>
+                    <div class="codeblock">
+                        <div class="codeblock__label">
+                            <span
+                                >Unoptimised x86-64, Intel syntax, symbol names
+                                shortened</span
+                            >
+                        </div>
+                        <pre><code>add:
+    push  rax                    <span class="c">; reserve 8 bytes (also keeps rsp 16-byte aligned)</span>
+    add   edi, esi               <span class="c">; a + b, arguments arrived in edi and esi</span>
+    mov   dword ptr [rsp + 4], edi
+    seto  al
+    jo    .overflow              <span class="c">; debug builds panic on i32 overflow</span>
+    mov   eax, dword ptr [rsp + 4]   <span class="c">; return value goes in eax</span>
+    pop   rcx                    <span class="c">; give the 8 bytes back</span>
+    ret                          <span class="c">; pop the return address and jump there</span>
+
+average:
+    push  rax
+    call  add                    <span class="c">; pushes the return address, jumps to add</span>
+    mov   dword ptr [rsp + 4], eax   <span class="c">; s</span>
+    …                            <span class="c">; check for the i32::MIN / -1 case, then divide</span>
+    idiv  ecx
+    pop   rcx
+    ret</code></pre>
+                    </div>
+                    <p>
+                        Which registers carry arguments and the return value is
+                        fixed by a
+                        <a
+                            href="https://en.wikipedia.org/wiki/Calling_convention"
+                            class="ext"
+                            >calling convention</a
+                        >. For C-compatible functions on Linux x86-64 that is
+                        the System V ABI: first integer argument in
+                        <code>rdi</code>, second in <code>rsi</code>, result in
+                        <code>rax</code>
+                        <a
+                            class="src"
+                            href="https://gitlab.com/x86-psABIs/x86-64-ABI"
+                            >System V psABI §3.2.3</a
+                        >. Plain Rust functions use the "Rust" ABI, and the
+                        documentation does not specify which registers it uses
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/core/primitive.fn.html#abi-compatibility"
+                            >fn: ABI compatibility</a
+                        >. In this build it happened to use the same registers.
+                        Treat that as an observation.
+                    </p>
+
+                    <h3 id="with-optimisation-the-frames-are-gone">
+                        With optimisation, the frames are gone
+                    </h3>
+                    <p>
+                        Built with <code>-O</code>, the whole chain becomes a
+                        few instructions inside <code>main</code>:
+                    </p>
+                    <div class="codeblock">
+                        <div class="codeblock__label">
+                            <span
+                                >Optimised (<code>-O</code>), the part of
+                                <code>main</code> that replaces both calls</span
+                            >
+                        </div>
+                        <pre><code>    mov   eax, dword ptr [rsp]   <span class="c">; x = 13</span>
+    mov   ecx, eax
+    add   eax, 7                 <span class="c">; x + 7</span>
+    shr   eax, 31                <span class="c">; sign fix-up for division by 2</span>
+    add   eax, ecx
+    add   eax, 7
+    sar   eax                    <span class="c">; / 2</span>
+    mov   dword ptr [rsp + 4], eax   <span class="c">; m</span></code></pre>
+                    </div>
+                    <p>
+                        The optimised output contains no <code>average</code> or
+                        <code>add</code> symbol and no <code>call</code> to
+                        either. The compiler
+                        <a
+                            href="https://en.wikipedia.org/wiki/Inline_expansion"
+                            class="ext"
+                            >inlined</a
+                        >
+                        them. The behaviour Rust promises is the printed
+                        <code>10</code>, not the number of frames. Frames, slots
+                        and calls are decisions of the compiler
+                        <span class="tag tag-comp">Compiler</span>, not rules of
+                        the language <span class="tag tag-rust">Rust</span>.
+                    </p>
+
+                    <h2 id="frames-are-not-ownership">
+                        Frames are not ownership
+                    </h2>
+                    <p>
+                        A stack frame is a run-time record of one function call
+                        <span class="tag tag-comp">Compiler</span>
+                        <span class="tag tag-os">OS</span>. Rust's ownership
+                        rules answer a different question: which binding is
+                        responsible for a value, and who may use it
+                        <span class="tag tag-rust">Rust</span>. A value owned by
+                        <code>main</code> can live on the heap, and a value in a
+                        frame can be owned by nobody in particular, like the
+                        return address.
+                        <a href="11-ownership-moves-clone-and-drop.html"
+                            >Ownership</a
+                        >
+                        is a separate picture, drawn on top of this one.
+                    </p>
+
+                    <h2 id="returning-does-not-clear-anything">
+                        Returning does not clear anything
+                    </h2>
+                    <p>
+                        <code>ret</code> pops the return address and jumps to
+                        it. That is all
+                        <a
+                            class="src"
+                            href="https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html"
+                            >Intel SDM Vol. 2, RET</a
+                        >. The returned frame's bytes stay as they were until a
+                        later call writes over them, which happens at step 7
+                        above. Safe Rust never lets you read that leftover
+                        memory: a
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            >reference</a
+                        >
+                        to a local cannot outlive the function.
+                    </p>
+
+                    <h2 id="recursion-is-the-same-thing-repeated">
+                        Recursion is the same thing, repeated
+                    </h2>
+                    <p>
+                        A function that calls itself gets a new frame for each
+                        call that has not returned yet. A recursion 10,000
+                        levels deep needs 10,000 frames at once. The main
+                        thread's stack on this machine is 8 MiB (<code
+                            >ulimit -s</code
+                        >
+                        prints 8192), and once frames reach its end the program
+                        crashes. That crash is a
+                        <a href="14-memory-bugs-and-rust-safety.html"
+                            >stack overflow</a
+                        >.
+                    </p>
+
+                    <div class="aside aside--wrong">
+                        <p class="aside__h">
+                            Three tempting pictures that are wrong
+                        </p>
+                        <p>
+                            "Every local variable has a slot on the stack."
+                            Above, even the debug build keeps <code>x</code>,
+                            <code>y</code>, <code>a</code> and <code>b</code> in
+                            registers only. The optimised build keeps almost
+                            nothing in memory.
+                        </p>
+                        <p>
+                            "Returning wipes the function's memory." The stack
+                            pointer moves; the bytes stay until something
+                            overwrites them.
+                        </p>
+                        <p>
+                            "<code>main</code> is the stack."
+                            <code>main</code> has one frame on the main thread's
+                            stack, with start-up frames above it. Other threads
+                            have
+                            <a href="06-threads-and-their-stacks.html"
+                                >their own stacks</a
+                            >.
+                        </p>
+                    </div>
+
+                    <section class="keep" aria-labelledby="keep-h">
+                        <h2 id="keep-h">What to remember</h2>
+                        <ol>
+                            <li>
+                                Each call that has not returned has a frame on
+                                its thread's stack; frames come and go last in,
+                                first out.
+                            </li>
+                            <li>
+                                A frame holds a return address and whatever the
+                                compiler chose to keep in memory. Many values
+                                live only in registers.
+                            </li>
+                            <li>
+                                Returning moves the stack pointer back; it does
+                                not erase the old frame's bytes.
+                            </li>
+                        </ol>
+                    </section>
+
+                    <section class="test" aria-labelledby="test-h">
+                        <h2 id="test-h">Check your understanding</h2>
+                        <details>
+                            <summary>
+                                While <code>add</code> runs, how many return
+                                addresses for this program's own functions are
+                                on the stack?
+                            </summary>
+                            <div>
+                                <p>
+                                    Two: one back into <code>main</code> (pushed
+                                    when <code>main</code> called
+                                    <code>average</code>) and one back into
+                                    <code>average</code> (pushed when it called
+                                    <code>add</code>). Above
+                                    <code>main</code> there are more, from the
+                                    start-up code.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                After <code>average</code> returns, is the value
+                                20 still in memory?
+                            </summary>
+                            <div>
+                                <p>
+                                    In this debug run, yes, in
+                                    <code>average</code>'s old slot and in
+                                    <code>add</code>'s, until the
+                                    <code>println!</code> calls reuse that
+                                    space. Nothing in safe Rust can read it.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                Does an optimised build of this program have a
+                                frame for <code>add</code>?
+                            </summary>
+                            <div>
+                                <p>
+                                    No. <code>add</code> was inlined into
+                                    <code>main</code>, so there is no call, no
+                                    return address and no frame for it.
+                                </p>
+                            </div>
+                        </details>
+                    </section>
+
+                    <p class="related">
+                        <b>Related:</b>
+                        <a href="02-how-a-cpu-runs-code.html"
+                            ><code>call</code> and <code>ret</code></a
+                        >
+                        ·
+                        <a href="06-threads-and-their-stacks.html"
+                            >one stack per thread</a
+                        >
+                        ·
+                        <a href="09-rust-values-stack-heap-and-box.html"
+                            >values that do not fit in a frame</a
+                        >
+                        ·
+                        <a href="14-memory-bugs-and-rust-safety.html"
+                            >stack overflow</a
+                        >
+                    </p>
+
+                    <p>
+                        <b>Next question:</b> <code>m</code> fitted in a 4-byte
+                        slot.
+                        <a href="09-rust-values-stack-heap-and-box.html"
+                            >Where does a value go when it should not live in a
+                            frame?</a
+                        >
+                    </p>
+                    <nav class="pager" aria-label="Previous and next">
+                        <a
+                            class="pager__prev"
+                            href="07-registers-caches-and-a-memory-read.html"
+                            rel="prev"
+                            ><span class="pager__dir">← Previous</span
+                            ><span class="pager__q"
+                                >Where do the bytes of one memory read come
+                                from?</span
+                            ></a
+                        >
+                        <a
+                            class="pager__next"
+                            href="09-rust-values-stack-heap-and-box.html"
+                            rel="next"
+                            ><span class="pager__dir">Next →</span
+                            ><span class="pager__q"
+                                >Where does a Rust value live, and what does Box
+                                change?</span
+                            ></a
+                        >
+                    </nav>
+                </article>
+                <footer class="foot">
+                    <p>
+                        Observed values, such as addresses, sizes, assembly and
+                        program output, come from one machine. It runs Linux 7.0
+                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
+                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
+                        limit. Addresses change on every run, and other systems,
+                        toolchains and allocators can differ. Details:
+                        <a href="../reference/sources.html">Sources</a> ·
+                        <code>examples/OUTPUT.txt</code>.
+                    </p>
+                </footer>
+            </main>
+            <nav class="otp" aria-label="On this page">
+                <p class="otp__h">On this page</p>
+                <ol class="otp__list">
+                    <li class="lv2">
+                        <a href="#what-the-compiler-actually-produced"
+                            >What the compiler actually produced</a
+                        >
+                    </li>
+                    <li class="lv3">
+                        <a href="#with-optimisation-the-frames-are-gone"
+                            >With optimisation, the frames are gone</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#frames-are-not-ownership"
+                            >Frames are not ownership</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#returning-does-not-clear-anything"
+                            >Returning does not clear anything</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#recursion-is-the-same-thing-repeated"
+                            >Recursion is the same thing, repeated</a
+                        >
+                    </li>
+                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
+                    <li class="lv2">
+                        <a href="#test-h">Check your understanding</a>
+                    </li>
+                </ol>
+            </nav>
+        </div>
+    </body>
+</html>

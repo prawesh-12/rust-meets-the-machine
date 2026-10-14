@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="en" class="no-js">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>
+            How does a CPU run code? — How a Rust program meets the machine
+        </title>
+        <meta
+            name="description"
+            content="What a CPU does with machine code: instructions, registers, the instruction pointer and execution units, stepped through the real x86-64 instructions rustc produced for compute(2, 3)."
+        />
+        <link rel="stylesheet" href="../assets/css/site.css" />
+        <script src="../assets/js/site.js"></script>
+        <script src="../assets/js/diagrams.js" defer></script>
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to the text</a>
+        <header class="top">
+            <a class="top__title" href="../index.html"
+                >How a Rust program meets the machine</a
+            >
+            <span class="top__here">02 · How a CPU runs code</span>
+            <span class="top__spacer"></span>
+            <button
+                class="top__btn"
+                type="button"
+                data-toc-toggle
+                aria-expanded="false"
+                aria-controls="toc"
+            >
+                Contents
+            </button>
+        </header>
+        <div class="shell">
+            <nav class="toc" id="toc" aria-label="Contents">
+                <a class="toc__home" href="../index.html">The whole map</a>
+                <p class="toc__group">Before your code runs</p>
+                <ol>
+                    <li>
+                        <a href="01-what-is-a-program.html"
+                            ><span class="n">01</span
+                            ><span>What a program is</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="02-how-a-cpu-runs-code.html"
+                            aria-current="page"
+                            ><span class="n">02</span
+                            ><span>How a CPU runs code</span></a
+                        >
+                        <ol class="toc__sub">
+                            <li class="lv2">
+                                <a
+                                    href="#registers-where-the-cpu-keeps-the-values-it-is-working-on"
+                                    >Registers: where the CPU keeps the values
+                                    it is working on</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#watching-compute-2-3-run"
+                                    >Watching compute(2, 3) run</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a
+                                    href="#fetch-decode-execute-a-model-not-a-blueprint"
+                                    >Fetch, decode, execute: a model, not a
+                                    blueprint</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#control-flow-calls-returns-and-loops"
+                                    >Control flow: calls, returns and loops</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#why-the-cpu-still-needs-memory"
+                                    >Why the CPU still needs memory</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a
+                                    href="#a-variable-is-not-always-a-box-in-memory"
+                                    >A variable is not always a box in memory</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#keep-h">What to remember</a>
+                            </li>
+                            <li class="lv2">
+                                <a href="#test-h">Check your understanding</a>
+                            </li>
+                        </ol>
+                    </li>
+                    <li>
+                        <a href="03-programs-processes-and-the-kernel.html"
+                            ><span class="n">03</span
+                            ><span>Processes and the kernel</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Addresses</p>
+                <ol>
+                    <li>
+                        <a href="04-virtual-memory.html"
+                            ><span class="n">04</span
+                            ><span>Inside an address space</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="05-physical-ram-and-address-translation.html"
+                            ><span class="n">05</span
+                            ><span>From virtual address to RAM</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="06-threads-and-their-stacks.html"
+                            ><span class="n">06</span
+                            ><span>Threads and their stacks</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="07-registers-caches-and-a-memory-read.html"
+                            ><span class="n">07</span
+                            ><span>Caches and one load</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Calls and data</p>
+                <ol>
+                    <li>
+                        <a href="08-function-calls-and-stack-frames.html"
+                            ><span class="n">08</span
+                            ><span>Calls and stack frames</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="09-rust-values-stack-heap-and-box.html"
+                            ><span class="n">09</span
+                            ><span>Values, stack, heap, Box</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="10-string-and-vec-memory.html"
+                            ><span class="n">10</span
+                            ><span>String and Vec</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Rust's rules</p>
+                <ol>
+                    <li>
+                        <a href="11-ownership-moves-clone-and-drop.html"
+                            ><span class="n">11</span
+                            ><span>Ownership, moves, drop</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            ><span class="n">12</span
+                            ><span>References and lifetimes</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="13-iterators-and-following-data.html"
+                            ><span class="n">13</span><span>Iterators</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="14-memory-bugs-and-rust-safety.html"
+                            ><span class="n">14</span
+                            ><span>Memory bugs and safety</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">All together</p>
+                <ol>
+                    <li>
+                        <a href="15-follow-one-example-end-to-end.html"
+                            ><span class="n">15</span
+                            ><span>One call, every layer</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Reference</p>
+                <ul class="toc__ref">
+                    <li><a href="../reference/glossary.html">Glossary</a></li>
+                    <li><a href="../reference/sources.html">Sources</a></li>
+                    <li>
+                        <a href="../reference/concept-map.html">Concept map</a>
+                    </li>
+                </ul>
+            </nav>
+            <main id="main">
+                <article class="page">
+                    <header class="opening">
+                        <div class="opening__meta">
+                            <span class="opening__num">02</span
+                            ><span class="tag tag-hw">CPU &amp; hardware</span>
+                        </div>
+                        <h1>How does a CPU run code?</h1>
+                        <p class="why">
+                            The compiler turned <code>compute</code> into four
+                            bytes of
+                            <a href="01-what-is-a-program.html">machine code</a>
+                            inside the executable file. A CPU reads bytes like
+                            these as instructions and carries them out, one
+                            after another.
+                        </p>
+                    </header>
+                    <ul
+                        class="legend"
+                        aria-label="Which layer each colour means"
+                    >
+                        <li><span class="sw sw-rust"></span>Rust language</li>
+                        <li>
+                            <span class="sw sw-comp"></span>Compiler &amp;
+                            runtime library
+                        </li>
+                        <li><span class="sw sw-os"></span>Operating system</li>
+                        <li>
+                            <span class="sw sw-hw"></span>CPU &amp; hardware
+                        </li>
+                    </ul>
+                    <p>
+                        A
+                        <a
+                            href="https://en.wikipedia.org/wiki/Central_processing_unit"
+                            class="ext"
+                            >CPU</a
+                        >
+                        <span class="tag tag-hw">Hardware</span> does not see
+                        functions, variables or types. It sees a stream of
+                        <span class="term">instructions</span>. Each instruction
+                        is a few bytes that ask for one small action. Typical
+                        actions are adding two numbers, comparing two numbers,
+                        copying a value from or to memory, and continuing at a
+                        different address. A Rust function becomes a short run
+                        of such instructions.
+                    </p>
+
+                    <h2
+                        id="registers-where-the-cpu-keeps-the-values-it-is-working-on"
+                    >
+                        Registers: where the CPU keeps the values it is working
+                        on
+                    </h2>
+                    <p>
+                        Most instructions do not work on memory directly. They
+                        work on
+                        <a
+                            href="https://en.wikipedia.org/wiki/Processor_register"
+                            class="ext"
+                            >registers</a
+                        >: a small set of storage slots inside each core, each
+                        holding one value of 64 bits on a 64-bit CPU.
+                        Instructions name registers directly, so reaching one
+                        costs almost nothing. The names depend on the
+                        architecture. On x86-64 there are sixteen
+                        <span class="term">general-purpose registers</span> such
+                        as <code>rax</code>, <code>rdi</code> and
+                        <code>rsi</code>
+                        <a
+                            class="src"
+                            href="https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html"
+                            >Intel SDM vol. 1</a
+                        >. 64-bit Arm has thirty-one, called <code>x0</code> to
+                        <code>x30</code>.
+                    </p>
+                    <p>Three registers matter for everything that follows:</p>
+                    <ul>
+                        <li>
+                            The <b>instruction pointer</b> holds the address of
+                            the next instruction. x86-64 calls it
+                            <code>rip</code>; Arm calls it the program counter,
+                            <code>PC</code>. Running a program means: read the
+                            instruction at this address, carry it out, move the
+                            pointer on.
+                        </li>
+                        <li>
+                            The <b>stack pointer</b>, <code>rsp</code> on
+                            x86-64, holds the address of the top of the current
+                            thread's
+                            <a href="08-function-calls-and-stack-frames.html"
+                                >stack</a
+                            >.
+                        </li>
+                        <li>
+                            The <b>flags</b> register records facts about the
+                            last result, such as "it was zero" or "it
+                            overflowed". A later instruction can branch on them.
+                            That is how an <code>if</code> or a loop is built.
+                        </li>
+                    </ul>
+                    <p>
+                        The actual arithmetic happens in the
+                        <span class="term">execution units</span>. The simplest
+                        picture is one
+                        <a
+                            href="https://en.wikipedia.org/wiki/Arithmetic_logic_unit"
+                            class="ext"
+                            >ALU</a
+                        >
+                        that takes two inputs and produces a result. Real cores
+                        have several units working at once.
+                    </p>
+
+                    <h2 id="watching-compute-2-3-run">
+                        Watching <code>compute(2, 3)</code> run
+                    </h2>
+                    <p>
+                        The figure uses the real instructions from an optimised
+                        build of the example program on x86-64. One adjustment
+                        was needed. If the compiler can see the numbers
+                        <code>2</code> and <code>3</code>, it computes
+                        <code>5</code> while compiling and no addition is left
+                        to watch. So the built version passes both numbers
+                        through <code>std::hint::black_box</code>, which asks
+                        the optimiser to treat them as unknown
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/std/hint/fn.black_box.html"
+                            >black_box docs</a
+                        >.
+                    </p>
+
+                    <figure
+                        class="fig"
+                        data-fig="steps-wires"
+                        data-label="CPU diagram"
+                    >
+                        <div class="fig__head">
+                            <p class="fig__title">
+                                A simplified core running the real instructions
+                            </p>
+                            <span class="fig__kind"
+                                >Real instructions · x86-64 · rustc -O ·
+                                simplified CPU</span
+                            >
+                        </div>
+                        <div class="fig__grid fig__grid--note">
+                            <div class="fig__body">
+                                <div class="machine">
+                                    <div class="chip">
+                                        <div class="chip__label">CPU core</div>
+                                        <div class="chip__grid">
+                                            <div
+                                                class="unit"
+                                                data-now="1 2 3 4 5 6"
+                                            >
+                                                <h5>Instruction pointer</h5>
+                                                <div class="reg">
+                                                    <span class="rn">rip</span
+                                                    ><span
+                                                        class="rv"
+                                                        data-vals='["14fcb","14fce","14fd2","15010","15013","14fd7","14fdb"]'
+                                                        >14fdb</span
+                                                    >
+                                                </div>
+                                                <p class="note-sm">
+                                                    address of the next
+                                                    instruction
+                                                </p>
+                                            </div>
+                                            <div
+                                                class="unit unit--wide"
+                                                data-now="1 2 3 4 5 6"
+                                            >
+                                                <h5>Fetch and decode</h5>
+                                                <div class="decode">
+                                                    <span
+                                                        class="ibytes"
+                                                        data-vals='["(waiting)","8b 3c 24","8b 74 24 08","e8 39 00 00 00","8d 04 37","c3","89 44 24 04"]'
+                                                        >89 44 24 04</span
+                                                    >
+                                                    →
+                                                    <b
+                                                        data-vals='["","mov edi, [rsp]","mov esi, [rsp+8]","call compute","lea eax, [rdi+rsi]","ret","mov [rsp+4], eax"]'
+                                                        >mov [rsp+4], eax</b
+                                                    >
+                                                </div>
+                                                <p
+                                                    class="note-sm"
+                                                    data-vals='["","load 4 bytes from the stack into edi","load 4 bytes from the stack into esi","save the return address, jump to compute","eax = rdi + rsi","jump back to the saved return address","store eax into memory"]'
+                                                >
+                                                    store eax into memory
+                                                </p>
+                                            </div>
+                                            <div class="unit">
+                                                <h5>Registers</h5>
+                                                <div class="reg" data-now="1">
+                                                    <span class="rn">rdi</span
+                                                    ><span
+                                                        class="rv"
+                                                        data-vals='["?","2"]'
+                                                        >2</span
+                                                    >
+                                                </div>
+                                                <div class="reg" data-now="2">
+                                                    <span class="rn">rsi</span
+                                                    ><span
+                                                        class="rv"
+                                                        data-vals='["?","?","3"]'
+                                                        >3</span
+                                                    >
+                                                </div>
+                                                <div class="reg" data-now="4">
+                                                    <span class="rn">rax</span
+                                                    ><span
+                                                        class="rv"
+                                                        data-vals='["?","?","?","?","5"]'
+                                                        >5</span
+                                                    >
+                                                </div>
+                                                <div class="reg" data-now="3 5">
+                                                    <span class="rn">rsp</span
+                                                    ><span
+                                                        class="rv"
+                                                        data-vals='["S","S","S","S − 8","S − 8","S"]'
+                                                        >S</span
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div class="unit" data-now="4">
+                                                <h5>Execution unit (ALU)</h5>
+                                                <div class="alu">
+                                                    <span
+                                                        class="v"
+                                                        data-vals='["","","","","2"]'
+                                                        >2</span
+                                                    ><span class="op">+</span
+                                                    ><span
+                                                        class="v"
+                                                        data-vals='["","","","","3"]'
+                                                        >3</span
+                                                    ><span class="op">=</span
+                                                    ><span
+                                                        class="v"
+                                                        data-vals='["","","","","5"]'
+                                                        >5</span
+                                                    >
+                                                </div>
+                                                <p
+                                                    class="note-sm"
+                                                    data-vals='["idle","idle","idle","idle","adds rdi and rsi","idle","idle"]'
+                                                >
+                                                    idle
+                                                </p>
+                                            </div>
+                                            <div
+                                                class="unit unit--wide"
+                                                data-now="1 2 3 5 6"
+                                            >
+                                                <h5>Load / store unit</h5>
+                                                <p
+                                                    class="note-sm"
+                                                    data-vals='["idle","read 4 bytes at S → 2","read 4 bytes at S+8 → 3","write return address 14fd7 at S−8","idle","read return address at S−8","write 5 at S+4"]'
+                                                >
+                                                    write 5 at S+4
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="ram">
+                                        <div class="ram__label">
+                                            Memory (outside the core)
+                                        </div>
+                                        <table aria-label="Memory contents">
+                                            <tr>
+                                                <th colspan="3">
+                                                    Code: <code>.text</code>
+                                                </th>
+                                            </tr>
+                                            <tr data-now="1">
+                                                <td class="addr">14fcb</td>
+                                                <td>8b 3c 24</td>
+                                                <td>mov edi,[rsp]</td>
+                                            </tr>
+                                            <tr data-now="2">
+                                                <td class="addr">14fce</td>
+                                                <td>8b 74 24 08</td>
+                                                <td>mov esi,[rsp+8]</td>
+                                            </tr>
+                                            <tr data-now="3">
+                                                <td class="addr">14fd2</td>
+                                                <td>e8 39 00 00 00</td>
+                                                <td>call compute</td>
+                                            </tr>
+                                            <tr data-now="6">
+                                                <td class="addr">14fd7</td>
+                                                <td>89 44 24 04</td>
+                                                <td>mov [rsp+4],eax</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="addr">…</td>
+                                                <td></td>
+                                                <td></td>
+                                            </tr>
+                                            <tr data-now="4">
+                                                <td class="addr">15010</td>
+                                                <td>8d 04 37</td>
+                                                <td>lea eax,[rdi+rsi]</td>
+                                            </tr>
+                                            <tr data-now="5">
+                                                <td class="addr">15013</td>
+                                                <td>c3</td>
+                                                <td>ret</td>
+                                            </tr>
+                                            <tr>
+                                                <th colspan="3">
+                                                    Stack of this thread
+                                                </th>
+                                            </tr>
+                                            <tr data-now="3 5">
+                                                <td class="addr">S−8</td>
+                                                <td
+                                                    colspan="2"
+                                                    data-vals='["(unused)","(unused)","(unused)","14fd7 return address","14fd7 return address","14fd7 (no longer in use)"]'
+                                                >
+                                                    14fd7 (no longer in use)
+                                                </td>
+                                            </tr>
+                                            <tr data-now="1">
+                                                <td class="addr">S</td>
+                                                <td colspan="2">2</td>
+                                            </tr>
+                                            <tr data-now="6">
+                                                <td class="addr">S+4</td>
+                                                <td
+                                                    colspan="2"
+                                                    data-vals='["?","?","?","?","?","?","5"]'
+                                                >
+                                                    5
+                                                </td>
+                                            </tr>
+                                            <tr data-now="2">
+                                                <td class="addr">S+8</td>
+                                                <td colspan="2">3</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div
+                                    class="controls"
+                                    data-stepper-controls
+                                ></div>
+                                <ol class="steps">
+                                    <li>
+                                        The instruction pointer holds
+                                        <code>14fcb</code>, the next instruction
+                                        in <code>main</code>. The numbers 2 and
+                                        3 are in this thread's stack, at the
+                                        address held in <code>rsp</code> (called
+                                        S here) and at S+8.
+                                    </li>
+                                    <li>
+                                        <b>Load.</b>
+                                        <code>mov edi, [rsp]</code> copies 4
+                                        bytes from memory into register
+                                        <code>edi</code> (the low half of
+                                        <code>rdi</code>). Now
+                                        <code>rdi</code> holds 2. The
+                                        instruction pointer moves past the
+                                        3-byte instruction.
+                                    </li>
+                                    <li>
+                                        <b>Load again.</b>
+                                        <code>mov esi, [rsp+8]</code> puts 3 in
+                                        <code>rsi</code>. Both inputs are now
+                                        inside the core.
+                                    </li>
+                                    <li>
+                                        <b>Call.</b> <code>call</code> writes
+                                        the address of the next instruction,
+                                        <code>14fd7</code>, onto the stack and
+                                        sets the instruction pointer to
+                                        <code>15010</code>, the start of
+                                        <code>compute</code>. That saved address
+                                        is how the CPU will find its way back.
+                                    </li>
+                                    <li>
+                                        <b>Add.</b>
+                                        <code>lea eax, [rdi+rsi]</code> sends 2
+                                        and 3 to the execution unit and writes 5
+                                        into <code>eax</code>. This is the whole
+                                        of <code>compute</code>. The variable
+                                        <code>x</code> never had a place in
+                                        memory: it only ever existed as a value
+                                        in a register.
+                                    </li>
+                                    <li>
+                                        <b>Return.</b> <code>ret</code> reads
+                                        the saved address back from the stack
+                                        and puts it in the instruction pointer.
+                                        Execution continues in
+                                        <code>main</code> at <code>14fd7</code>.
+                                        The result is still in <code>eax</code>.
+                                    </li>
+                                    <li>
+                                        <b>Store.</b> <code>main</code> needs
+                                        the result in memory so it can be
+                                        printed, so
+                                        <code>mov [rsp+4], eax</code> writes 5
+                                        into the stack.
+                                    </li>
+                                </ol>
+                            </div>
+                            <aside class="leaves-out">
+                                <h4>What this picture leaves out</h4>
+                                <ul>
+                                    <li>
+                                        Addresses like <code>14fcb</code> are
+                                        positions inside this one executable. At
+                                        run time the kernel adds a random base.
+                                        S stands for whatever address
+                                        <code>rsp</code> held.
+                                    </li>
+                                    <li>
+                                        A real core decodes several instructions
+                                        at once, keeps many in flight, and may
+                                        run them out of order. The step-by-step
+                                        picture is a model of the result, not
+                                        the timing.
+                                    </li>
+                                    <li>
+                                        Instruction bytes and stack values
+                                        usually come from
+                                        <a
+                                            href="07-registers-caches-and-a-memory-read.html"
+                                            >caches</a
+                                        >, not straight from RAM.
+                                    </li>
+                                    <li>
+                                        Which registers carry arguments is
+                                        decided by the compiler. For plain Rust
+                                        functions this is not a documented,
+                                        stable rule.
+                                    </li>
+                                </ul>
+                            </aside>
+                        </div>
+                    </figure>
+
+                    <h2 id="fetch-decode-execute-a-model-not-a-blueprint">
+                        Fetch, decode, execute: a model, not a blueprint
+                    </h2>
+                    <p>
+                        The figure uses the classic
+                        <a
+                            href="https://en.wikipedia.org/wiki/Instruction_cycle"
+                            class="ext"
+                            >fetch–decode–execute</a
+                        >
+                        model. The core fetches the bytes at the instruction
+                        pointer, decodes them into an operation, executes it,
+                        moves the pointer on, and repeats.
+                    </p>
+                    <p>
+                        It is the right first picture, and the results it
+                        predicts are the results you get.
+                    </p>
+                    <p>
+                        It is not how a modern core is built. A current x86-64
+                        or Arm core fetches and decodes several instructions per
+                        cycle and sends them to many execution units. When one
+                        instruction is waiting for memory, the core can finish
+                        later ones first,
+                        <a
+                            href="https://en.wikipedia.org/wiki/Out-of-order_execution"
+                            class="ext"
+                            >out of order</a
+                        >. Different instructions take different amounts of
+                        time. The hardware makes sure the program sees the same
+                        results as if each instruction had run one after
+                        another.
+                    </p>
+
+                    <h2 id="control-flow-calls-returns-and-loops">
+                        Control flow: calls, returns and loops
+                    </h2>
+                    <p>
+                        Normally the instruction pointer moves to the next
+                        instruction. A few instructions change it on purpose. A
+                        <span class="term">jump</span> sets it to another
+                        address. A
+                        <span class="term">conditional branch</span> does so
+                        only if the flags say so, which is how
+                        <code>if</code> and loops work: a loop is a branch back
+                        to an earlier address.
+                    </p>
+                    <p>
+                        A <span class="term">call</span> saves the address of
+                        the next instruction and jumps; a
+                        <span class="term">return</span> jumps back to the saved
+                        address. Steps 3 and 5 of the figure show that pair. On
+                        x86-64 the saved address goes on the thread's
+                        <a href="08-function-calls-and-stack-frames.html"
+                            >stack</a
+                        >.
+                    </p>
+
+                    <h2 id="why-the-cpu-still-needs-memory">
+                        Why the CPU still needs memory
+                    </h2>
+                    <p>
+                        If registers are so fast, why use memory at all? Because
+                        there are only a handful of them. A program has far more
+                        data than that: a <code>Vec</code> of a million numbers,
+                        the text of every string, the machine code itself.
+                    </p>
+                    <p>
+                        Registers hold what the core is working on
+                        <em>right now</em>. Everything else lives in memory, and
+                        instructions copy values in (a
+                        <span class="term">load</span>) and out (a
+                        <span class="term">store</span>) when they need them. In
+                        the figure, steps 1, 2 and 6 are exactly that.
+                    </p>
+                    <p>
+                        The CPU and RAM are separate parts. RAM sits outside the
+                        core, and reaching it takes far longer than reaching a
+                        register. That gap is why CPUs have
+                        <a href="07-registers-caches-and-a-memory-read.html"
+                            >caches</a
+                        >.
+                    </p>
+
+                    <h2 id="a-variable-is-not-always-a-box-in-memory">
+                        A variable is not always a box in memory
+                    </h2>
+                    <p>
+                        It is tempting to imagine that every
+                        <code>let</code> creates a small box in RAM. The
+                        optimised <code>compute</code> above shows otherwise:
+                        <code>x</code> exists only as a value in
+                        <code>eax</code>. Build the same function without
+                        optimisation and you get a different picture:
+                    </p>
+                    <div class="codeblock">
+                        <div class="codeblock__label">
+                            <span
+                                ><code>compute</code> built with
+                                <code>-C opt-level=0</code> · real output</span
+                            >
+                        </div>
+                        <pre><code>push  rax                     <span class="c">reserve 8 bytes of stack</span>
+add   edi, esi                <span class="c">a + b</span>
+mov   dword ptr [rsp + 4], edi   <span class="c">x gets a stack slot</span>
+seto  al
+jo    .LBB8_2                 <span class="c">overflow? jump to the panic</span>
+mov   eax, dword ptr [rsp + 4]   <span class="c">read x back as the return value</span>
+pop   rcx
+ret</code></pre>
+                    </div>
+                    <p>
+                        Here <code>x</code> does get a slot on the stack, and
+                        there is an extra check: Rust panics on integer overflow
+                        in debug builds, so the code jumps to a panic if the
+                        addition overflowed
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/reference/expressions/operator-expr.html#overflow"
+                            >Rust Reference</a
+                        >. Same source, two different sets of instructions. Both
+                        are correct, because both produce the same result. Rust
+                        promises what your program does, not which register or
+                        memory slot a variable uses
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/reference/type-layout.html"
+                            >Rust Reference</a
+                        >.
+                    </p>
+
+                    <section class="keep" aria-labelledby="keep-h">
+                        <h2 id="keep-h">What to remember</h2>
+                        <ol>
+                            <li>
+                                The CPU runs machine instructions. Each one is a
+                                small step on registers or memory.
+                            </li>
+                            <li>
+                                The instruction pointer says what runs next;
+                                calls, returns and branches change it.
+                            </li>
+                            <li>
+                                A variable may live in a register, in memory, or
+                                nowhere at all after optimisation.
+                            </li>
+                        </ol>
+                    </section>
+
+                    <section class="test" aria-labelledby="test-h">
+                        <h2 id="test-h">Check your understanding</h2>
+                        <details>
+                            <summary>
+                                Does the CPU know that <code>x</code> is called
+                                <code>x</code>?
+                            </summary>
+                            <div>
+                                <p>
+                                    No. Names exist in the source and in debug
+                                    information. The instructions only mention
+                                    registers and addresses. In the optimised
+                                    build, <code>x</code> is only the value that
+                                    ends up in <code>eax</code>.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                After <code>call</code>, how does
+                                <code>ret</code> know where to go back to?
+                            </summary>
+                            <div>
+                                <p>
+                                    <code>call</code> wrote the address of the
+                                    next instruction onto the stack.
+                                    <code>ret</code> reads it back and puts it
+                                    in the instruction pointer.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                Is "one instruction per clock tick, one after
+                                another" an accurate description of a modern
+                                CPU?
+                            </summary>
+                            <div>
+                                <p>
+                                    No. It is a teaching model. Real cores
+                                    overlap many instructions and can finish
+                                    them out of order. They guarantee that the
+                                    results match the one-at-a-time model.
+                                </p>
+                            </div>
+                        </details>
+                    </section>
+
+                    <p class="related">
+                        <b>Related:</b>
+                        <a href="01-what-is-a-program.html"
+                            >where the instruction bytes came from</a
+                        >
+                        ·
+                        <a href="08-function-calls-and-stack-frames.html"
+                            >the stack that <code>call</code> and
+                            <code>ret</code> use</a
+                        >
+                        ·
+                        <a href="07-registers-caches-and-a-memory-read.html"
+                            >where a load really gets its bytes</a
+                        >
+                    </p>
+
+                    <p>
+                        <b>Next question:</b> a computer runs many programs, but
+                        each core runs one stream of instructions at a time.
+                        <a href="03-programs-processes-and-the-kernel.html"
+                            >Who decides what runs, and what does each running
+                            program get?</a
+                        >
+                    </p>
+                    <nav class="pager" aria-label="Previous and next">
+                        <a
+                            class="pager__prev"
+                            href="01-what-is-a-program.html"
+                            rel="prev"
+                            ><span class="pager__dir">← Previous</span
+                            ><span class="pager__q">What is a program?</span></a
+                        >
+                        <a
+                            class="pager__next"
+                            href="03-programs-processes-and-the-kernel.html"
+                            rel="next"
+                            ><span class="pager__dir">Next →</span
+                            ><span class="pager__q"
+                                >What does a program get when it starts
+                                running?</span
+                            ></a
+                        >
+                    </nav>
+                </article>
+                <footer class="foot">
+                    <p>
+                        Observed values, such as addresses, sizes, assembly and
+                        program output, come from one machine. It runs Linux 7.0
+                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
+                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
+                        limit. Addresses change on every run, and other systems,
+                        toolchains and allocators can differ. Details:
+                        <a href="../reference/sources.html">Sources</a> ·
+                        <code>examples/OUTPUT.txt</code>.
+                    </p>
+                </footer>
+            </main>
+            <nav class="otp" aria-label="On this page">
+                <p class="otp__h">On this page</p>
+                <ol class="otp__list">
+                    <li class="lv2">
+                        <a
+                            href="#registers-where-the-cpu-keeps-the-values-it-is-working-on"
+                            >Registers: where the CPU keeps the values it is
+                            working on</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#watching-compute-2-3-run"
+                            >Watching compute(2, 3) run</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#fetch-decode-execute-a-model-not-a-blueprint"
+                            >Fetch, decode, execute: a model, not a blueprint</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#control-flow-calls-returns-and-loops"
+                            >Control flow: calls, returns and loops</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#why-the-cpu-still-needs-memory"
+                            >Why the CPU still needs memory</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#a-variable-is-not-always-a-box-in-memory"
+                            >A variable is not always a box in memory</a
+                        >
+                    </li>
+                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
+                    <li class="lv2">
+                        <a href="#test-h">Check your understanding</a>
+                    </li>
+                </ol>
+            </nav>
+        </div>
+    </body>
+</html>

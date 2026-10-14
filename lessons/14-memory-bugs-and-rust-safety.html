@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="en" class="no-js">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>
+            How do memory bugs happen, and what does Rust change? — How a Rust
+            program meets the machine
+        </title>
+        <meta
+            name="description"
+            content="What actually goes wrong in a stack overflow, an out-of-bounds access and a use-after-free; what C allows, what Rust does instead, with real outputs; and the problems Rust&#x27;s safety guarantees do not cover."
+        />
+        <link rel="stylesheet" href="../assets/css/site.css" />
+        <script src="../assets/js/site.js"></script>
+        <script src="../assets/js/diagrams.js" defer></script>
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to the text</a>
+        <header class="top">
+            <a class="top__title" href="../index.html"
+                >How a Rust program meets the machine</a
+            >
+            <span class="top__here">14 · Memory bugs and safety</span>
+            <span class="top__spacer"></span>
+            <button
+                class="top__btn"
+                type="button"
+                data-toc-toggle
+                aria-expanded="false"
+                aria-controls="toc"
+            >
+                Contents
+            </button>
+        </header>
+        <div class="shell">
+            <nav class="toc" id="toc" aria-label="Contents">
+                <a class="toc__home" href="../index.html">The whole map</a>
+                <p class="toc__group">Before your code runs</p>
+                <ol>
+                    <li>
+                        <a href="01-what-is-a-program.html"
+                            ><span class="n">01</span
+                            ><span>What a program is</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="02-how-a-cpu-runs-code.html"
+                            ><span class="n">02</span
+                            ><span>How a CPU runs code</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="03-programs-processes-and-the-kernel.html"
+                            ><span class="n">03</span
+                            ><span>Processes and the kernel</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Addresses</p>
+                <ol>
+                    <li>
+                        <a href="04-virtual-memory.html"
+                            ><span class="n">04</span
+                            ><span>Inside an address space</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="05-physical-ram-and-address-translation.html"
+                            ><span class="n">05</span
+                            ><span>From virtual address to RAM</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="06-threads-and-their-stacks.html"
+                            ><span class="n">06</span
+                            ><span>Threads and their stacks</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="07-registers-caches-and-a-memory-read.html"
+                            ><span class="n">07</span
+                            ><span>Caches and one load</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Calls and data</p>
+                <ol>
+                    <li>
+                        <a href="08-function-calls-and-stack-frames.html"
+                            ><span class="n">08</span
+                            ><span>Calls and stack frames</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="09-rust-values-stack-heap-and-box.html"
+                            ><span class="n">09</span
+                            ><span>Values, stack, heap, Box</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="10-string-and-vec-memory.html"
+                            ><span class="n">10</span
+                            ><span>String and Vec</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Rust's rules</p>
+                <ol>
+                    <li>
+                        <a href="11-ownership-moves-clone-and-drop.html"
+                            ><span class="n">11</span
+                            ><span>Ownership, moves, drop</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            ><span class="n">12</span
+                            ><span>References and lifetimes</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="13-iterators-and-following-data.html"
+                            ><span class="n">13</span><span>Iterators</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="14-memory-bugs-and-rust-safety.html"
+                            aria-current="page"
+                            ><span class="n">14</span
+                            ><span>Memory bugs and safety</span></a
+                        >
+                        <ol class="toc__sub">
+                            <li class="lv2">
+                                <a href="#two-kinds-of-failure"
+                                    >Two kinds of failure</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#1-stack-overflow"
+                                    >1. Stack overflow</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#2-reading-past-the-end-of-a-buffer"
+                                    >2. Reading past the end of a buffer</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#3-using-memory-after-it-was-freed"
+                                    >3. Using memory after it was freed</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#what-unsafe-changes"
+                                    >What unsafe changes</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#what-safe-rust-does-not-promise"
+                                    >What safe Rust does not promise</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#keep-h">What to remember</a>
+                            </li>
+                            <li class="lv2">
+                                <a href="#test-h">Check your understanding</a>
+                            </li>
+                        </ol>
+                    </li>
+                </ol>
+                <p class="toc__group">All together</p>
+                <ol>
+                    <li>
+                        <a href="15-follow-one-example-end-to-end.html"
+                            ><span class="n">15</span
+                            ><span>One call, every layer</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Reference</p>
+                <ul class="toc__ref">
+                    <li><a href="../reference/glossary.html">Glossary</a></li>
+                    <li><a href="../reference/sources.html">Sources</a></li>
+                    <li>
+                        <a href="../reference/concept-map.html">Concept map</a>
+                    </li>
+                </ul>
+            </nav>
+            <main id="main">
+                <article class="page">
+                    <header class="opening">
+                        <div class="opening__meta">
+                            <span class="opening__num">14</span
+                            ><span class="tag tag-rust">Rust</span>
+                            <span class="tag tag-os">Operating system</span>
+                        </div>
+                        <h1>
+                            How do memory bugs happen, and what does Rust
+                            change?
+                        </h1>
+                        <p class="why">
+                            Rust's compiler rejects programs that break its
+                            ownership and borrowing rules. Those rules exist
+                            because of real memory bugs. For each bug, here is
+                            what the machine does when it happens, and whether
+                            Rust stops it at compile time, at run time, or not
+                            at all.
+                        </p>
+                    </header>
+                    <ul
+                        class="legend"
+                        aria-label="Which layer each colour means"
+                    >
+                        <li><span class="sw sw-rust"></span>Rust language</li>
+                        <li>
+                            <span class="sw sw-comp"></span>Compiler &amp;
+                            runtime library
+                        </li>
+                        <li><span class="sw sw-os"></span>Operating system</li>
+                        <li>
+                            <span class="sw sw-hw"></span>CPU &amp; hardware
+                        </li>
+                    </ul>
+                    <h2 id="two-kinds-of-failure">Two kinds of failure</h2>
+                    <p>Keep two outcomes apart:</p>
+                    <ul>
+                        <li>
+                            A <span class="term">panic</span> is a controlled
+                            stop. Rust detects the problem, prints a message, by
+                            default unwinds the thread, running destructors on
+                            the way
+                            <a
+                                class="src"
+                                href="https://doc.rust-lang.org/book/ch09-01-unrecoverable-errors-with-panic.html"
+                                >The Book §9.1</a
+                            >. A panic in the main thread ended the examples
+                            here with exit status 101. Nothing was corrupted;
+                            the program refused to continue.
+                        </li>
+                        <li>
+                            <span class="term">Undefined behaviour</span> means
+                            the language makes no promise at all about what
+                            happens next. The program might crash, appear to
+                            work, or silently corrupt data. Safe Rust is
+                            designed so that it cannot cause undefined
+                            behaviour; the list of what counts is in the
+                            Reference
+                            <a
+                                class="src"
+                                href="https://doc.rust-lang.org/reference/behavior-considered-undefined.html"
+                                >Reference: undefined behavior</a
+                            >. In C, out-of-bounds access and use-after-free are
+                            undefined behaviour, and the language does not
+                            describe stack overflow at all.
+                        </li>
+                    </ul>
+
+                    <h2 id="1-stack-overflow">1. Stack overflow</h2>
+                    <p>
+                        Every call that has not returned keeps a
+                        <a href="08-function-calls-and-stack-frames.html"
+                            >frame</a
+                        >
+                        on the thread's stack. A thread's stack has a fixed
+                        maximum size: 8 MiB for the main thread on this machine
+                        (<code>ulimit -s</code>), and 2 MiB by default for
+                        threads Rust spawns
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/std/thread/index.html#stack-size"
+                            >std::thread: stack size</a
+                        >. Below the stack is a
+                        <span class="term">guard page</span>: memory that is
+                        deliberately not mapped, so touching it causes a
+                        <a href="05-physical-ram-and-address-translation.html"
+                            >page fault</a
+                        >
+                        the kernel cannot resolve
+                        <span class="tag tag-os">OS</span>. Running into it is a
+                        <a
+                            href="https://en.wikipedia.org/wiki/Stack_overflow"
+                            class="ext"
+                            >stack overflow</a
+                        >.
+                    </p>
+
+                    <figure
+                        class="fig"
+                        data-fig="none"
+                        data-label="stack overflow diagram"
+                    >
+                        <div class="fig__head">
+                            <p class="fig__title">
+                                Ten million frames do not fit in 8 MiB
+                            </p>
+                            <span class="fig__kind"
+                                >Schematic · not to scale</span
+                            >
+                        </div>
+                        <div class="fig__grid fig__grid--note">
+                            <div class="fig__body">
+                                <div class="callstack callstack--even">
+                                    <pre><code><span class="k">fn</span> depth(n: u64) -&gt; u64 {
+    <span class="k">let</span> frame_data = [n <span class="k">as</span> u8; 256];
+    std::hint::black_box(&amp;frame_data);
+    <span class="k">if</span> n == 0 { 0 }
+    <span class="k">else</span> { depth(n - 1) + frame_data[0] <span class="k">as</span> u64 }
+}
+
+depth(10_000_000)</code></pre>
+                                    <div>
+                                        <div class="stack1__h">
+                                            Main thread's stack
+                                            <span>8 MiB limit</span>
+                                        </div>
+                                        <div class="stack1">
+                                            <div class="frm">
+                                                <div class="frm__h">main</div>
+                                            </div>
+                                            <div class="frm">
+                                                <div class="frm__h">
+                                                    depth(10000000)
+                                                    <small>≥ 256 bytes</small>
+                                                </div>
+                                            </div>
+                                            <div class="frm">
+                                                <div class="frm__h">
+                                                    depth(9999999)
+                                                </div>
+                                            </div>
+                                            <div class="frm">
+                                                <div class="frm__h">
+                                                    depth(9999998)
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="frm"
+                                                style="
+                                                    text-align: center;
+                                                    border-style: dotted;
+                                                "
+                                            >
+                                                ⋮ tens of thousands more ⋮
+                                            </div>
+                                            <div class="frm">
+                                                <div class="frm__h">
+                                                    depth(…)
+                                                </div>
+                                            </div>
+                                            <div class="guard">
+                                                guard page · not mapped<br /><b
+                                                    >the next frame lands here →
+                                                    fault</b
+                                                >
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <aside class="leaves-out">
+                                <h4>What this picture leaves out</h4>
+                                <ul>
+                                    <li>
+                                        The exact frame size and how many frames
+                                        fitted. Each frame holds at least the
+                                        256-byte array plus a return address.
+                                    </li>
+                                    <li>
+                                        The kernel's handling of the main
+                                        thread's stack, which is grown on demand
+                                        up to the limit.
+                                    </li>
+                                    <li>
+                                        The signal handler's own small stack,
+                                        which Rust sets up so it can still run
+                                        when the main stack is full.
+                                    </li>
+                                </ul>
+                            </aside>
+                        </div>
+                    </figure>
+
+                    <div class="codeblock">
+                        <div class="codeblock__label">
+                            <span><code>examples/recurse.rs</code> output</span
+                            ><span>exit status 134</span>
+                        </div>
+                        <pre
+                            class="out"
+                        ><code>thread 'main' (…) has overflowed its stack
+fatal runtime error: stack overflow, aborting</code></pre>
+                    </div>
+                    <div class="cmp">
+                        <div>
+                            <h4>What the code intended</h4>
+                            <p>
+                                Recurse ten million levels and add up the
+                                results.
+                            </p>
+                        </div>
+                        <div>
+                            <h4>What C allows</h4>
+                            <p>
+                                The same deep recursion. Usually the guard page
+                                stops it with a segmentation fault. A very large
+                                frame can step over the guard page entirely and
+                                write into other memory, which is undefined
+                                behaviour.
+                            </p>
+                        </div>
+                        <div>
+                            <h4>What Rust does</h4>
+                            <p>
+                                Compiles it: stack depth is not checked at
+                                compile time. The fault in the guard page is
+                                caught by a handler that the standard library
+                                installs, which prints the message above and
+                                aborts
+                                <a
+                                    class="src"
+                                    href="https://github.com/rust-lang/rust/blob/1.98.1/library/std/src/sys/pal/unix/stack_overflow.rs"
+                                    >std source: stack_overflow.rs</a
+                                >.
+                            </p>
+                        </div>
+                    </div>
+                    <p>
+                        So Rust does not make deep recursion safe to run; it
+                        makes running out of stack a clean crash instead of
+                        memory corruption. Exit status 134 is 128 + 6, the
+                        signal <code>SIGABRT</code>. An earlier version of this
+                        example used <code>count_down(n + 1) + 1</code>. Built
+                        with <code>-O</code>, it never overflowed at all: the
+                        optimiser turned the recursion into a loop, and the
+                        program ran forever. Whether recursion uses stack is the
+                        <a href="08-function-calls-and-stack-frames.html"
+                            >compiler's decision</a
+                        >.
+                    </p>
+
+                    <h2 id="2-reading-past-the-end-of-a-buffer">
+                        2. Reading past the end of a buffer
+                    </h2>
+                    <p>
+                        <code>scores</code> has 3 elements. Element 10 would be
+                        40 bytes past the start of the buffer, in memory that
+                        belongs to something else or to nothing.
+                    </p>
+
+                    <figure
+                        class="fig"
+                        data-fig="none"
+                        data-label="out of bounds diagram"
+                    >
+                        <div class="fig__head">
+                            <p class="fig__title">
+                                Index 10 of a 3-element buffer
+                            </p>
+                            <span class="fig__kind">Schematic</span>
+                        </div>
+                        <div class="fig__grid fig__grid--note">
+                            <div class="fig__body">
+                                <div class="oob">
+                                    <div class="cells">
+                                        <div class="cell">
+                                            10<small>[0]</small>
+                                        </div>
+                                        <div class="cell">
+                                            20<small>[1]</small>
+                                        </div>
+                                        <div class="cell">
+                                            30<small>[2]</small>
+                                        </div>
+                                    </div>
+                                    <div class="beyond">
+                                        <div class="cell">
+                                            ?<small>[3]</small>
+                                        </div>
+                                        <div class="cell">…</div>
+                                        <div class="cell">
+                                            ?<small>[10]</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="note-sm" style="margin-top: 0.6rem">
+                                    The three real elements, then bytes that
+                                    belong to the allocator's bookkeeping, to
+                                    another allocation, or to an unmapped page.
+                                </p>
+                            </div>
+                            <aside class="leaves-out">
+                                <h4>What this picture leaves out</h4>
+                                <ul>
+                                    <li>
+                                        The <code>Vec</code>'s spare capacity.
+                                        Indexing checks against
+                                        <code>len</code>, so slots beyond
+                                        <code>len</code> are out of bounds even
+                                        inside the buffer.
+                                    </li>
+                                    <li>
+                                        What actually lies after the buffer; it
+                                        depends on the allocator and on the run.
+                                    </li>
+                                </ul>
+                            </aside>
+                        </div>
+                    </figure>
+
+                    <div class="codeblock">
+                        <div class="codeblock__label">
+                            <span
+                                ><code>examples/index.rs</code>:
+                                <code>i</code> is 10, computed at run time</span
+                            ><span>exit status 101</span>
+                        </div>
+                        <pre><code>println!(<span class="k">"{:?}"</span>, v.get(i));
+println!(<span class="k">"{}"</span>, v[i]);</code></pre>
+                        <pre class="out"><code>None
+
+thread 'main' (…) panicked at index.rs:5:21:
+index out of bounds: the len is 3 but the index is 10</code></pre>
+                    </div>
+                    <div class="cmp">
+                        <div>
+                            <h4>What the code intended</h4>
+                            <p>Read element 10, assuming there is one.</p>
+                        </div>
+                        <div>
+                            <h4>What C allows</h4>
+                            <p>
+                                Reads whatever bytes are 40 bytes past the
+                                start, with no check. A write there corrupts
+                                another object. This is the classic
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Buffer_overflow"
+                                    class="ext"
+                                    >buffer overflow</a
+                                >.
+                            </p>
+                        </div>
+                        <div>
+                            <h4>What Rust does</h4>
+                            <p>
+                                Indexing a slice or <code>Vec</code> checks the
+                                index against the length at run time; if the
+                                check fails the thread panics
+                                <a
+                                    class="src"
+                                    href="https://doc.rust-lang.org/reference/expressions/array-expr.html#array-and-slice-indexing-expressions"
+                                    >Reference: indexing</a
+                                >. <code>get</code> returns
+                                <code>None</code> instead
+                                <a
+                                    class="src"
+                                    href="https://doc.rust-lang.org/std/primitive.slice.html#method.get"
+                                    >slice::get</a
+                                >.
+                            </p>
+                        </div>
+                    </div>
+                    <p>
+                        The bounds check is a compare and a branch before the
+                        load. In loops like the one in <code>total</code>, the
+                        compiler can often prove the index is always in range
+                        and remove the check.
+                        <a href="13-iterators-and-following-data.html"
+                            >Iterators</a
+                        >
+                        never need one per element.
+                    </p>
+
+                    <h2 id="3-using-memory-after-it-was-freed">
+                        3. Using memory after it was freed
+                    </h2>
+                    <p>
+                        A
+                        <a
+                            href="https://en.wikipedia.org/wiki/Dangling_pointer"
+                            class="ext"
+                            >use-after-free</a
+                        >
+                        reads or writes through a pointer whose memory has
+                        already been given back. The allocator may have handed
+                        that block to someone else, so the read sees their data
+                        and the write damages it.
+                    </p>
+
+                    <figure
+                        class="fig"
+                        data-fig="wires"
+                        data-label="use after free diagram"
+                    >
+                        <div class="fig__head">
+                            <p class="fig__title">
+                                A pointer that outlived its buffer
+                            </p>
+                            <span class="fig__kind"
+                                >Schematic · what Rust's borrow checker
+                                rejects</span
+                            >
+                        </div>
+                        <div class="fig__grid fig__grid--note">
+                            <div class="fig__body">
+                                <div class="refdraw">
+                                    <div class="refdraw__refs">
+                                        <div class="rd-r1">
+                                            <span
+                                                class="refbox is-bad"
+                                                data-wire-to="uaf-old"
+                                                data-wire-cls="bad"
+                                                data-wire-side="bottom>top"
+                                                >first → old address</span
+                                            ><small
+                                                >still holds the address of
+                                                element 0</small
+                                            >
+                                        </div>
+                                    </div>
+                                    <div class="refdraw__mem">
+                                        <div class="rd-handle">
+                                            <div class="handle-row">
+                                                <div class="handle">
+                                                    <div>
+                                                        <small>ptr</small
+                                                        ><b>new</b>
+                                                    </div>
+                                                    <div>
+                                                        <small>len</small
+                                                        ><b>3</b>
+                                                    </div>
+                                                    <div>
+                                                        <small>cap</small
+                                                        ><b>4</b>
+                                                    </div>
+                                                </div>
+                                                <span class="name">scores</span>
+                                            </div>
+                                        </div>
+                                        <div class="heap-zone rd-heap">
+                                            <div class="heap-zone__h">Heap</div>
+                                            <div class="bufs">
+                                                <div class="buf is-freed">
+                                                    <span class="buf__addr"
+                                                        >old block</span
+                                                    >
+                                                    <div class="cells">
+                                                        <div
+                                                            class="cell"
+                                                            id="uaf-old"
+                                                        >
+                                                            10
+                                                        </div>
+                                                        <div class="cell">
+                                                            20
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="buf">
+                                                    <span class="buf__addr"
+                                                        >new block</span
+                                                    >
+                                                    <div class="cells">
+                                                        <div class="cell">
+                                                            10
+                                                        </div>
+                                                        <div class="cell">
+                                                            20
+                                                        </div>
+                                                        <div class="cell">
+                                                            30
+                                                        </div>
+                                                        <div
+                                                            class="cell cell--spare"
+                                                        >
+                                                            ·
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <aside class="leaves-out">
+                                <h4>What this picture leaves out</h4>
+                                <ul>
+                                    <li>
+                                        Who reuses the freed block, and when.
+                                        That is what makes these bugs hard to
+                                        reproduce: the same code works until the
+                                        block is reused.
+                                    </li>
+                                    <li>
+                                        The <code>Vec</code>'s arrow to its new
+                                        block.
+                                    </li>
+                                </ul>
+                            </aside>
+                        </div>
+                    </figure>
+
+                    <div class="cmp">
+                        <div>
+                            <h4>What the code intended</h4>
+                            <p>
+                                Keep a reference to element 0, push, then read
+                                element 0 through the reference.
+                            </p>
+                        </div>
+                        <div>
+                            <h4>What C allows</h4>
+                            <p>
+                                Exactly that. If the push moved the buffer, the
+                                read uses freed memory: undefined behaviour,
+                                often a silent wrong value.
+                            </p>
+                        </div>
+                        <div>
+                            <h4>What Rust does</h4>
+                            <p>
+                                Rejects it at compile time (E0502, a
+                                <a
+                                    href="12-references-borrowing-and-lifetimes.html"
+                                    >borrow conflict</a
+                                >). Returning a reference to a local (E0106) and
+                                keeping one past its owner's scope (E0597) are
+                                rejected the same way. A double free is ruled
+                                out by single
+                                <a href="11-ownership-moves-clone-and-drop.html"
+                                    >ownership</a
+                                >.
+                            </p>
+                        </div>
+                    </div>
+                    <p>
+                        This class of bug is stopped before the program runs,
+                        with no run-time cost. The price is that some correct
+                        programs are rejected too: holding
+                        <code>&amp;scores[0]</code> across a
+                        <a href="10-string-and-vec-memory.html"
+                            ><code>push</code></a
+                        >
+                        is rejected even in a run where the buffer would not
+                        have moved.
+                    </p>
+
+                    <h2 id="what-unsafe-changes">
+                        What <code>unsafe</code> changes
+                    </h2>
+                    <p>
+                        Inside an <code>unsafe</code> block you can dereference
+                        raw pointers, and the compiler no longer checks that
+                        they point to live memory. Accessing "a place that is
+                        dangling" is undefined behaviour
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/reference/behavior-considered-undefined.html"
+                            >Reference: undefined behavior</a
+                        >, and so is a data race. Writing
+                        <code>unsafe</code> does not switch the rules off; it
+                        makes keeping them your job instead of the compiler's.
+                        This site's examples contain no
+                        <code>unsafe</code> code, and none of them demonstrate
+                        undefined behaviour, because its outcome would prove
+                        nothing.
+                    </p>
+
+                    <h2 id="what-safe-rust-does-not-promise">
+                        What safe Rust does not promise
+                    </h2>
+                    <p>
+                        The Reference lists behaviour that is wrong but not
+                        unsafe
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/reference/behavior-not-considered-unsafe.html"
+                            >Reference: behavior not considered unsafe</a
+                        >. Among them:
+                    </p>
+                    <ul>
+                        <li>
+                            <b>Leaks.</b> Memory that is never freed.
+                            <code>std::mem::forget</code> is a safe function,
+                            because "Rust's safety guarantees do not include a
+                            guarantee that destructors will always run"
+                            <a
+                                class="src"
+                                href="https://doc.rust-lang.org/std/mem/fn.forget.html"
+                                >std::mem::forget</a
+                            >.
+                        </li>
+                        <li><b>Deadlocks</b> between threads.</li>
+                        <li>
+                            <b>Integer overflow.</b> Debug builds panic (the
+                            debug build of
+                            <a href="08-function-calls-and-stack-frames.html"
+                                ><code>add</code></a
+                            >
+                            contains a <code>jo</code> instruction for exactly
+                            this); release builds may wrap around silently
+                            <a
+                                class="src"
+                                href="https://doc.rust-lang.org/reference/expressions/operator-expr.html#overflow"
+                                >Reference: overflow</a
+                            >.
+                        </li>
+                        <li>
+                            Stack overflow, panics, and wrong results from wrong
+                            logic.
+                        </li>
+                    </ul>
+
+                    <div class="aside aside--wrong">
+                        <p class="aside__h">
+                            Three tempting pictures that are wrong
+                        </p>
+                        <p>
+                            "Rust makes recursion safe." Deep recursion still
+                            runs out of stack. Rust turns that into a clean
+                            abort.
+                        </p>
+                        <p>
+                            "Rust catches every memory bug in every program." It
+                            rules them out in safe code.
+                            <code>unsafe</code> code, and the libraries it lives
+                            in, still need care.
+                        </p>
+                        <p>
+                            "A panic is memory corruption." A panic is the
+                            opposite: a check that fired before anything was
+                            corrupted.
+                        </p>
+                    </div>
+
+                    <section class="keep" aria-labelledby="keep-h">
+                        <h2 id="keep-h">What to remember</h2>
+                        <ol>
+                            <li>
+                                Out-of-bounds indexing panics at run time;
+                                use-after-free and double free are rejected at
+                                compile time; stack overflow becomes an abort.
+                            </li>
+                            <li>
+                                A panic is a controlled stop. Undefined
+                                behaviour is the absence of any promise, and
+                                safe Rust cannot cause it.
+                            </li>
+                            <li>
+                                Leaks, deadlocks, integer overflow and stack
+                                overflow are still possible in safe Rust.
+                            </li>
+                        </ol>
+                    </section>
+
+                    <section class="test" aria-labelledby="test-h">
+                        <h2 id="test-h">Check your understanding</h2>
+                        <details>
+                            <summary>
+                                Is <code>v[10]</code> on a 3-element
+                                <code>Vec</code> a compile error?
+                            </summary>
+                            <div>
+                                <p>
+                                    Not when the index is only known at run
+                                    time. It compiles, and the bounds check
+                                    panics when it runs. With a constant index
+                                    on an array, the compiler can catch it
+                                    earlier.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>Can safe Rust leak memory?</summary>
+                            <div>
+                                <p>
+                                    Yes. <code>std::mem::forget</code> and
+                                    reference-counted cycles both leak, and both
+                                    are safe. Leaks waste memory but do not
+                                    corrupt it.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                Why does <code>recurse.rs</code> exit with
+                                status 134 rather than 101?
+                            </summary>
+                            <div>
+                                <p>
+                                    A stack overflow is not turned into a panic.
+                                    The handler prints a message and aborts the
+                                    process, and 134 = 128 + 6
+                                    (<code>SIGABRT</code>). A panic in the main
+                                    thread exits with 101.
+                                </p>
+                            </div>
+                        </details>
+                    </section>
+
+                    <p class="related">
+                        <b>Related:</b>
+                        <a href="08-function-calls-and-stack-frames.html"
+                            >frames</a
+                        >
+                        ·
+                        <a href="05-physical-ram-and-address-translation.html"
+                            >page faults</a
+                        >
+                        ·
+                        <a href="10-string-and-vec-memory.html">buffer moves</a>
+                        ·
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            >borrow rules</a
+                        >
+                    </p>
+
+                    <p>
+                        <b>Next question:</b>
+                        <a href="15-follow-one-example-end-to-end.html"
+                            >What happens at every layer, in order, when
+                            <code>total(&amp;scores)</code> runs?</a
+                        >
+                    </p>
+                    <nav class="pager" aria-label="Previous and next">
+                        <a
+                            class="pager__prev"
+                            href="13-iterators-and-following-data.html"
+                            rel="prev"
+                            ><span class="pager__dir">← Previous</span
+                            ><span class="pager__q"
+                                >What does a loop over a Vec actually hand
+                                you?</span
+                            ></a
+                        >
+                        <a
+                            class="pager__next"
+                            href="15-follow-one-example-end-to-end.html"
+                            rel="next"
+                            ><span class="pager__dir">Next →</span
+                            ><span class="pager__q"
+                                >What happens, layer by layer, when
+                                <code>total(&amp;scores)</code> runs?</span
+                            ></a
+                        >
+                    </nav>
+                </article>
+                <footer class="foot">
+                    <p>
+                        Observed values, such as addresses, sizes, assembly and
+                        program output, come from one machine. It runs Linux 7.0
+                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
+                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
+                        limit. Addresses change on every run, and other systems,
+                        toolchains and allocators can differ. Details:
+                        <a href="../reference/sources.html">Sources</a> ·
+                        <code>examples/OUTPUT.txt</code>.
+                    </p>
+                </footer>
+            </main>
+            <nav class="otp" aria-label="On this page">
+                <p class="otp__h">On this page</p>
+                <ol class="otp__list">
+                    <li class="lv2">
+                        <a href="#two-kinds-of-failure">Two kinds of failure</a>
+                    </li>
+                    <li class="lv2">
+                        <a href="#1-stack-overflow">1. Stack overflow</a>
+                    </li>
+                    <li class="lv2">
+                        <a href="#2-reading-past-the-end-of-a-buffer"
+                            >2. Reading past the end of a buffer</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#3-using-memory-after-it-was-freed"
+                            >3. Using memory after it was freed</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#what-unsafe-changes">What unsafe changes</a>
+                    </li>
+                    <li class="lv2">
+                        <a href="#what-safe-rust-does-not-promise"
+                            >What safe Rust does not promise</a
+                        >
+                    </li>
+                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
+                    <li class="lv2">
+                        <a href="#test-h">Check your understanding</a>
+                    </li>
+                </ol>
+            </nav>
+        </div>
+    </body>
+</html>

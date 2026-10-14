@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="en" class="no-js">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>
+            What is a Vec made of, and what happens when it grows? — How a Rust
+            program meets the machine
+        </title>
+        <meta
+            name="description"
+            content="What a Vec and a String are made of: a small handle of pointer, length and capacity, plus a heap buffer; what push does when there is spare room and when there is not; and why a reference into the buffer blocks push."
+        />
+        <link rel="stylesheet" href="../assets/css/site.css" />
+        <script src="../assets/js/site.js"></script>
+        <script src="../assets/js/diagrams.js" defer></script>
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to the text</a>
+        <header class="top">
+            <a class="top__title" href="../index.html"
+                >How a Rust program meets the machine</a
+            >
+            <span class="top__here">10 · String and Vec</span>
+            <span class="top__spacer"></span>
+            <button
+                class="top__btn"
+                type="button"
+                data-toc-toggle
+                aria-expanded="false"
+                aria-controls="toc"
+            >
+                Contents
+            </button>
+        </header>
+        <div class="shell">
+            <nav class="toc" id="toc" aria-label="Contents">
+                <a class="toc__home" href="../index.html">The whole map</a>
+                <p class="toc__group">Before your code runs</p>
+                <ol>
+                    <li>
+                        <a href="01-what-is-a-program.html"
+                            ><span class="n">01</span
+                            ><span>What a program is</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="02-how-a-cpu-runs-code.html"
+                            ><span class="n">02</span
+                            ><span>How a CPU runs code</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="03-programs-processes-and-the-kernel.html"
+                            ><span class="n">03</span
+                            ><span>Processes and the kernel</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Addresses</p>
+                <ol>
+                    <li>
+                        <a href="04-virtual-memory.html"
+                            ><span class="n">04</span
+                            ><span>Inside an address space</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="05-physical-ram-and-address-translation.html"
+                            ><span class="n">05</span
+                            ><span>From virtual address to RAM</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="06-threads-and-their-stacks.html"
+                            ><span class="n">06</span
+                            ><span>Threads and their stacks</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="07-registers-caches-and-a-memory-read.html"
+                            ><span class="n">07</span
+                            ><span>Caches and one load</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Calls and data</p>
+                <ol>
+                    <li>
+                        <a href="08-function-calls-and-stack-frames.html"
+                            ><span class="n">08</span
+                            ><span>Calls and stack frames</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="09-rust-values-stack-heap-and-box.html"
+                            ><span class="n">09</span
+                            ><span>Values, stack, heap, Box</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="10-string-and-vec-memory.html"
+                            aria-current="page"
+                            ><span class="n">10</span
+                            ><span>String and Vec</span></a
+                        >
+                        <ol class="toc__sub">
+                            <li class="lv2">
+                                <a href="#a-handle-and-a-buffer"
+                                    >A handle and a buffer</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#what-the-run-actually-printed"
+                                    >What the run actually printed</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a
+                                    href="#why-a-reference-into-the-buffer-blocks-push"
+                                    >Why a reference into the buffer blocks
+                                    push</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#an-empty-vec-has-no-buffer"
+                                    >An empty Vec has no buffer</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#string-is-a-vec-of-utf-8-bytes"
+                                    >String is a Vec of UTF-8 bytes</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#keep-h">What to remember</a>
+                            </li>
+                            <li class="lv2">
+                                <a href="#test-h">Check your understanding</a>
+                            </li>
+                        </ol>
+                    </li>
+                </ol>
+                <p class="toc__group">Rust's rules</p>
+                <ol>
+                    <li>
+                        <a href="11-ownership-moves-clone-and-drop.html"
+                            ><span class="n">11</span
+                            ><span>Ownership, moves, drop</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            ><span class="n">12</span
+                            ><span>References and lifetimes</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="13-iterators-and-following-data.html"
+                            ><span class="n">13</span><span>Iterators</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="14-memory-bugs-and-rust-safety.html"
+                            ><span class="n">14</span
+                            ><span>Memory bugs and safety</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">All together</p>
+                <ol>
+                    <li>
+                        <a href="15-follow-one-example-end-to-end.html"
+                            ><span class="n">15</span
+                            ><span>One call, every layer</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Reference</p>
+                <ul class="toc__ref">
+                    <li><a href="../reference/glossary.html">Glossary</a></li>
+                    <li><a href="../reference/sources.html">Sources</a></li>
+                    <li>
+                        <a href="../reference/concept-map.html">Concept map</a>
+                    </li>
+                </ul>
+            </nav>
+            <main id="main">
+                <article class="page">
+                    <header class="opening">
+                        <div class="opening__meta">
+                            <span class="opening__num">10</span
+                            ><span class="tag tag-rust">Rust</span>
+                            <span class="tag tag-comp"
+                                >Compiler &amp; runtime</span
+                            >
+                        </div>
+                        <h1>
+                            What is a Vec made of, and what happens when it
+                            grows?
+                        </h1>
+                        <p class="why">
+                            A
+                            <a href="09-rust-values-stack-heap-and-box.html"
+                                ><code>Box</code></a
+                            >
+                            points to one value of a fixed size. A list such as
+                            <code>scores</code> holds a number of elements that
+                            changes while the program runs. A
+                            <code>Vec</code> does this with a small handle and a
+                            separate buffer that can grow. Several of Rust's
+                            rules exist because that buffer can move.
+                        </p>
+                    </header>
+                    <ul
+                        class="legend"
+                        aria-label="Which layer each colour means"
+                    >
+                        <li><span class="sw sw-rust"></span>Rust language</li>
+                        <li>
+                            <span class="sw sw-comp"></span>Compiler &amp;
+                            runtime library
+                        </li>
+                        <li><span class="sw sw-os"></span>Operating system</li>
+                        <li>
+                            <span class="sw sw-hw"></span>CPU &amp; hardware
+                        </li>
+                    </ul>
+                    <h2 id="a-handle-and-a-buffer">A handle and a buffer</h2>
+                    <p>
+                        A <code>Vec&lt;i32&gt;</code> value is three machine
+                        words <span class="tag tag-rust">Rust</span>
+                        <span class="tag tag-comp">Library</span>:
+                    </p>
+                    <ul>
+                        <li><b>ptr</b>: the address of a heap buffer;</li>
+                        <li><b>len</b>: how many elements are in use;</li>
+                        <li>
+                            <b>cap</b>: how many elements fit in the buffer
+                            before it has to grow.
+                        </li>
+                    </ul>
+                    <p>
+                        The documentation describes a <code>Vec</code> as "a
+                        (pointer, capacity, length) triplet", and says the order
+                        of those three fields is unspecified
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/std/vec/struct.Vec.html#guarantees"
+                            >Vec: guarantees</a
+                        >. On this machine
+                        <code>size_of::&lt;Vec&lt;i32&gt;&gt;()</code> is 24:
+                        three 8-byte words. The elements themselves are in the
+                        buffer, one after another with no gaps, which is why
+                        walking a <code>Vec</code> in order is
+                        <a href="07-registers-caches-and-a-memory-read.html"
+                            >cache-friendly</a
+                        >.
+                    </p>
+                    <p>
+                        The handle is stored wherever the
+                        <code>scores</code> binding is stored, typically
+                        <code>main</code>'s frame. The buffer comes from the
+                        <a href="09-rust-values-stack-heap-and-box.html"
+                            >global allocator</a
+                        >. The <code>Vec</code> owns the buffer: when
+                        <code>scores</code> is dropped, the elements are dropped
+                        and the buffer is freed.
+                    </p>
+
+                    <figure class="fig" data-fig="vec" data-label="Vec diagram">
+                        <div class="fig__head">
+                            <p class="fig__title">
+                                The handle, the buffer, and two
+                                <code>push</code> calls
+                            </p>
+                            <span class="fig__kind"
+                                >Both outcomes observed · addresses
+                                shortened</span
+                            >
+                        </div>
+                        <div class="controls">
+                            <span class="controls__label"
+                                >When the buffer is full</span
+                            >
+                            <div class="seg" data-choice="grow">
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="place"
+                                    aria-pressed="true"
+                                >
+                                    grows in place
+                                </button>
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="move"
+                                >
+                                    has to move
+                                </button>
+                            </div>
+                            <span class="controls__sep"></span>
+                            <span class="controls__label"
+                                >Keep <code>&amp;scores[0]</code></span
+                            >
+                            <div class="seg" data-choice="borrow">
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="no"
+                                    aria-pressed="true"
+                                >
+                                    no
+                                </button>
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="yes"
+                                >
+                                    yes
+                                </button>
+                            </div>
+                        </div>
+                        <div class="fig__grid fig__grid--note">
+                            <div class="fig__body">
+                                <div class="callstack callstack--2">
+                                    <pre
+                                        class="src-lines js-only"
+                                    ><code data-vec-code></code></pre>
+                                    <div class="vecfig js-only"></div>
+                                </div>
+                                <div
+                                    class="codeblock codeblock--bad js-only"
+                                    data-vec-error
+                                    hidden
+                                >
+                                    <div class="codeblock__label">
+                                        <span
+                                            ><code
+                                                >examples/borrowmut.rs</code
+                                            ></span
+                                        ><span class="verdict"
+                                            >does not compile</span
+                                        >
+                                    </div>
+                                    <pre
+                                        class="out"
+                                    ><code>error[E0502]: cannot borrow `scores` as mutable because it is also borrowed as immutable
+ --&gt; borrowmut.rs:5:5
+  |
+4 |     let first = &amp;scores[0];
+  |                  ------ immutable borrow occurs here
+5 |     scores.push(30);
+  |     ^^^^^^^^^^^^^^^ mutable borrow occurs here
+6 |     println!("{first}");
+  |                ----- immutable borrow later used here</code></pre>
+                                </div>
+
+                                <div class="no-js-only">
+                                    <pre><code><span class="k">let mut</span> scores = vec![10, 20];
+scores.push(30);
+scores.push(40);</code></pre>
+                                    <div class="vecfig">
+                                        <div class="handle-row">
+                                            <span class="name">scores</span>
+                                            <div class="handle">
+                                                <div>
+                                                    <small>ptr</small
+                                                    ><b>…8d50</b>
+                                                </div>
+                                                <div>
+                                                    <small>len</small
+                                                    ><b>2 → 3 → 4</b>
+                                                </div>
+                                                <div>
+                                                    <small>cap</small
+                                                    ><b>2 → 4</b>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="heap-zone">
+                                            <div class="heap-zone__h">Heap</div>
+                                            <div class="bufs">
+                                                <div class="buf">
+                                                    <span class="buf__addr"
+                                                        >0x5621…8d50 · before
+                                                        the first push</span
+                                                    >
+                                                    <div class="cells">
+                                                        <div class="cell">
+                                                            10<small>[0]</small>
+                                                        </div>
+                                                        <div class="cell">
+                                                            20<small>[1]</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="buf">
+                                                    <span class="buf__addr"
+                                                        >same block, grown in
+                                                        place · after both
+                                                        pushes</span
+                                                    >
+                                                    <div class="cells">
+                                                        <div class="cell">
+                                                            10<small>[0]</small>
+                                                        </div>
+                                                        <div class="cell">
+                                                            20<small>[1]</small>
+                                                        </div>
+                                                        <div
+                                                            class="cell is-new"
+                                                        >
+                                                            30<small>[2]</small>
+                                                        </div>
+                                                        <div
+                                                            class="cell is-new"
+                                                        >
+                                                            40<small>[3]</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="controls"
+                                    data-stepper-controls
+                                ></div>
+                                <p class="now-says" aria-live="polite"></p>
+                                <ol class="steps">
+                                    <li>
+                                        <code>vec![10, 20]</code> allocates room
+                                        for exactly two elements and fills it:
+                                        <code>len</code> 2, <code>cap</code> 2.
+                                    </li>
+                                    <li>
+                                        <code>push(30)</code> finds
+                                        <code>len == cap</code>, so the
+                                        <code>Vec</code> asks the allocator for
+                                        a bigger block (room for 4 in this run).
+                                    </li>
+                                    <li>
+                                        Either the allocator grows the block
+                                        where it is, which is what happened
+                                        here, or it hands out a new block. In
+                                        the second case the elements are copied
+                                        and the old block is freed.
+                                    </li>
+                                    <li>
+                                        30 is written into slot [2]:
+                                        <code>len</code> 3, <code>cap</code> 4.
+                                    </li>
+                                    <li>
+                                        <code>push(40)</code> uses the spare
+                                        slot. No allocation happens.
+                                    </li>
+                                </ol>
+                            </div>
+                            <aside class="leaves-out">
+                                <h4>What this picture leaves out</h4>
+                                <ul>
+                                    <li>
+                                        The order of <code>ptr</code>,
+                                        <code>len</code> and
+                                        <code>cap</code> inside the handle. It
+                                        is not specified; the drawing picks one.
+                                        The
+                                        <a
+                                            href="15-follow-one-example-end-to-end.html"
+                                            >optimised build of
+                                            <code>sum.rs</code></a
+                                        >
+                                        stored them as <code>cap</code>,
+                                        <code>ptr</code>, <code>len</code>.
+                                    </li>
+                                    <li>
+                                        The allocator's headers and rounding.
+                                        glibc's smallest block already had room
+                                        for four <code>i32</code>s, which is why
+                                        the first growth happened in place.
+                                    </li>
+                                    <li>
+                                        How much the capacity grows by. This run
+                                        doubled it; the documentation does not
+                                        promise any growth strategy.
+                                    </li>
+                                    <li>
+                                        In the run below, the second vector
+                                        moved from <code>…8d70</code> to
+                                        <code>…8db0</code> when it grew from 4
+                                        to 8 elements. The "has to move" view
+                                        uses those two addresses for the same
+                                        kind of move one growth earlier.
+                                    </li>
+                                </ul>
+                            </aside>
+                        </div>
+                    </figure>
+
+                    <h2 id="what-the-run-actually-printed">
+                        What the run actually printed
+                    </h2>
+                    <p>
+                        From <code>examples/vec.rs</code> on this machine
+                        (addresses change on every run):
+                    </p>
+                    <div class="codeblock">
+                        <div class="codeblock__label">
+                            <span>Output, shortened</span
+                            ><span>from <code>examples/OUTPUT.txt</code></span>
+                        </div>
+                        <pre
+                            class="out"
+                        ><code>len=2 cap=2 buffer at 0x562196998d50
+len=3 cap=4 buffer at 0x562196998d50     <span class="c">← grew in place</span>
+len=4 cap=4 buffer at 0x562196998d50     <span class="c">← spare slot, no allocation</span>
+w: len=2 cap=2 buffer at 0x562196998d70  (neighbour at 0x562196998d90)
+w: len=3 cap=4 buffer at 0x562196998d70
+w: len=4 cap=4 buffer at 0x562196998d70
+w: len=5 cap=8 buffer at 0x562196998db0  <span class="c">← moved: the neighbour was in the way</span></code></pre>
+                    </div>
+                    <p>
+                        The second vector, <code>w</code>, had a small
+                        allocation placed right after its buffer. Growing to 4
+                        elements still fitted in its block; growing to 8 did
+                        not, and the buffer moved.
+                    </p>
+                    <p>
+                        Whether a growth moves the buffer is up to the
+                        allocator. The C library's
+                        <code>realloc</code> describes both outcomes. The
+                        returned pointer "may be the same as p if the allocation
+                        was not moved (e.g., there was room to expand the
+                        allocation in-place)". Otherwise, "if the area pointed
+                        to was moved, a free(p) is done"
+                        <a
+                            class="src"
+                            href="https://man7.org/linux/man-pages/man3/malloc.3.html"
+                            >malloc(3)</a
+                        >. What <code>Vec</code> itself promises is narrower:
+                        "push and insert will never (re)allocate if the reported
+                        capacity is sufficient"
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/std/vec/struct.Vec.html#guarantees"
+                            >Vec: guarantees</a
+                        >.
+                    </p>
+
+                    <h2 id="why-a-reference-into-the-buffer-blocks-push">
+                        Why a reference into the buffer blocks <code>push</code>
+                    </h2>
+                    <p>
+                        Turn on <b>Keep <code>&amp;scores[0]</code></b> in the
+                        figure above and pick <b>has to move</b>.
+                        <code>first</code> holds the address of element 0. After
+                        the move, that address is inside a freed block: reading
+                        it would be a
+                        <a
+                            href="https://en.wikipedia.org/wiki/Dangling_pointer"
+                            class="ext"
+                            >dangling pointer</a
+                        >
+                        read. Rust does not wait to see which outcome happens.
+                        <code>push</code> takes <code>&amp;mut self</code>, and
+                        a mutable borrow cannot overlap a shared one, so the
+                        compiler rejects the program in both cases with E0502
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/book/ch08-01-vectors.html"
+                            >The Book §8.1</a
+                        >. That rule is the heart of
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            >borrowing</a
+                        >.
+                    </p>
+
+                    <h2 id="an-empty-vec-has-no-buffer">
+                        An empty <code>Vec</code> has no buffer
+                    </h2>
+                    <p>
+                        <code>Vec::new()</code> printed
+                        <code>len=0 cap=0</code>: nothing was allocated. The
+                        documentation guarantees that a vector with capacity 0
+                        does not allocate
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/std/vec/struct.Vec.html#guarantees"
+                            >Vec: guarantees</a
+                        >. The first <code>push</code> allocates.
+                    </p>
+
+                    <h2 id="string-is-a-vec-of-utf-8-bytes">
+                        <code>String</code> is a <code>Vec</code> of UTF-8 bytes
+                    </h2>
+                    <p>
+                        A <code>String</code> has the same shape: pointer,
+                        length, capacity, 24 bytes on this machine. Its buffer
+                        holds bytes, and the bytes are always valid
+                        <a
+                            href="https://en.wikipedia.org/wiki/UTF-8"
+                            class="ext"
+                            >UTF-8</a
+                        >
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/std/string/struct.String.html#representation"
+                            >String: representation</a
+                        >. <code>len()</code> counts those bytes, not
+                        characters:
+                    </p>
+                    <div class="strpanel">
+                        <div>
+                            <p class="note-sm">
+                                <code>String::from("hi")</code>:
+                                <code>len</code> 2, 2 characters
+                            </p>
+                            <div class="bytes cells--gap">
+                                <span>104<small>h</small></span
+                                ><span>105<small>i</small></span>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="note-sm">
+                                <code>String::from("né")</code>:
+                                <code>len</code> 3, 2 characters
+                            </p>
+                            <div class="bytes cells--gap">
+                                <span>110<small>n</small></span
+                                ><span class="cont"
+                                    >195<small>é, byte 1</small></span
+                                ><span class="cont"
+                                    >169<small>é, byte 2</small></span
+                                >
+                            </div>
+                        </div>
+                    </div>
+                    <p>
+                        The bytes are from <code>examples/vec.rs</code>, which
+                        printed <code>bytes=[110, 195, 169]</code> for
+                        <code>"né"</code>.
+                    </p>
+                    <p>
+                        The text <code>"hi"</code> in the source is not a
+                        <code>String</code>. It is a
+                        <code>&amp;'static str</code>: a pointer and a length
+                        referring to bytes stored inside the executable file,
+                        which are mapped read-only into the process's
+                        <a href="04-virtual-memory.html">address space</a>.
+                        <code>String::from</code> copies those bytes into a new
+                        heap buffer that the <code>String</code> owns and can
+                        grow
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html#the-string-type"
+                            >The Book §4.1</a
+                        >.
+                    </p>
+
+                    <div class="aside aside--wrong">
+                        <p class="aside__h">
+                            Four tempting pictures that are wrong
+                        </p>
+                        <p>
+                            "Every <code>push</code> allocates." Only a push
+                            with <code>len == cap</code> does. The last push
+                            above allocated nothing.
+                        </p>
+                        <p>
+                            "Growing always moves the buffer." In this run, the
+                            first growth stayed at the same address.
+                        </p>
+                        <p>
+                            "The handle is <code>ptr</code>, then
+                            <code>len</code>, then <code>cap</code>." The order
+                            is unspecified.
+                        </p>
+                        <p>
+                            "<code>len()</code> of a <code>String</code> is its
+                            number of characters." It is the number of bytes.
+                        </p>
+                    </div>
+
+                    <section class="keep" aria-labelledby="keep-h">
+                        <h2 id="keep-h">What to remember</h2>
+                        <ol>
+                            <li>
+                                A <code>Vec</code> is a small handle (pointer,
+                                length, capacity) that owns a heap buffer of
+                                elements stored next to each other.
+                            </li>
+                            <li>
+                                A push with spare capacity writes into the
+                                buffer; a push without it gets a bigger block,
+                                which may be at a new address.
+                            </li>
+                            <li>
+                                Because the buffer can move, a reference into it
+                                cannot be held across a <code>push</code>.
+                            </li>
+                        </ol>
+                    </section>
+
+                    <section class="test" aria-labelledby="test-h">
+                        <h2 id="test-h">Check your understanding</h2>
+                        <details>
+                            <summary>
+                                A <code>Vec</code> has <code>len</code> 3 and
+                                <code>cap</code> 4. Does the next
+                                <code>push</code> allocate?
+                            </summary>
+                            <div>
+                                <p>
+                                    No. There is one spare slot. The push after
+                                    that would need a bigger block.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                How many bytes does
+                                <code>String::from("né")</code> report as its
+                                length?
+                            </summary>
+                            <div>
+                                <p>
+                                    3: one byte for <code>n</code> and two for
+                                    <code>é</code> in UTF-8.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                If the allocator happened to grow the buffer in
+                                place, would <code>first</code> still be valid?
+                                Why does Rust reject the program anyway?
+                            </summary>
+                            <div>
+                                <p>
+                                    In that run it would still point at element
+                                    0. But the program cannot know beforehand
+                                    which outcome it gets. The borrow rules are
+                                    checked at compile time, so a shared borrow
+                                    cannot overlap the mutable borrow that
+                                    <code>push</code> needs.
+                                </p>
+                            </div>
+                        </details>
+                    </section>
+
+                    <p class="related">
+                        <b>Related:</b>
+                        <a href="09-rust-values-stack-heap-and-box.html"
+                            ><code>Box</code> and the allocator</a
+                        >
+                        ·
+                        <a href="11-ownership-moves-clone-and-drop.html"
+                            >moving the handle</a
+                        >
+                        ·
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            >the borrow rules</a
+                        >
+                        ·
+                        <a href="07-registers-caches-and-a-memory-read.html"
+                            >cache lines</a
+                        >
+                    </p>
+
+                    <p>
+                        <b>Next question:</b>
+                        <a href="11-ownership-moves-clone-and-drop.html"
+                            >if <code>let b = a;</code> copies a
+                            <code>String</code>'s 24-byte handle, which of the
+                            two is responsible for freeing the buffer?</a
+                        >
+                    </p>
+                    <nav class="pager" aria-label="Previous and next">
+                        <a
+                            class="pager__prev"
+                            href="09-rust-values-stack-heap-and-box.html"
+                            rel="prev"
+                            ><span class="pager__dir">← Previous</span
+                            ><span class="pager__q"
+                                >Where does a Rust value live, and what does Box
+                                change?</span
+                            ></a
+                        >
+                        <a
+                            class="pager__next"
+                            href="11-ownership-moves-clone-and-drop.html"
+                            rel="next"
+                            ><span class="pager__dir">Next →</span
+                            ><span class="pager__q"
+                                >Who frees a String's memory, and what does
+                                <code>let b = a;</code> change?</span
+                            ></a
+                        >
+                    </nav>
+                </article>
+                <footer class="foot">
+                    <p>
+                        Observed values, such as addresses, sizes, assembly and
+                        program output, come from one machine. It runs Linux 7.0
+                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
+                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
+                        limit. Addresses change on every run, and other systems,
+                        toolchains and allocators can differ. Details:
+                        <a href="../reference/sources.html">Sources</a> ·
+                        <code>examples/OUTPUT.txt</code>.
+                    </p>
+                </footer>
+            </main>
+            <nav class="otp" aria-label="On this page">
+                <p class="otp__h">On this page</p>
+                <ol class="otp__list">
+                    <li class="lv2">
+                        <a href="#a-handle-and-a-buffer"
+                            >A handle and a buffer</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#what-the-run-actually-printed"
+                            >What the run actually printed</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#why-a-reference-into-the-buffer-blocks-push"
+                            >Why a reference into the buffer blocks push</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#an-empty-vec-has-no-buffer"
+                            >An empty Vec has no buffer</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#string-is-a-vec-of-utf-8-bytes"
+                            >String is a Vec of UTF-8 bytes</a
+                        >
+                    </li>
+                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
+                    <li class="lv2">
+                        <a href="#test-h">Check your understanding</a>
+                    </li>
+                </ol>
+            </nav>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="en" class="no-js">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>
+            How does a virtual address reach physical RAM? — How a Rust program
+            meets the machine
+        </title>
+        <meta
+            name="description"
+            content="How the MMU turns a virtual address into a physical one: pages and frames, page number and offset, page tables, the TLB, and page faults, with an address translator you can drive."
+        />
+        <link rel="stylesheet" href="../assets/css/site.css" />
+        <script src="../assets/js/site.js"></script>
+        <script src="../assets/js/diagrams.js" defer></script>
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to the text</a>
+        <header class="top">
+            <a class="top__title" href="../index.html"
+                >How a Rust program meets the machine</a
+            >
+            <span class="top__here">05 · From virtual address to RAM</span>
+            <span class="top__spacer"></span>
+            <button
+                class="top__btn"
+                type="button"
+                data-toc-toggle
+                aria-expanded="false"
+                aria-controls="toc"
+            >
+                Contents
+            </button>
+        </header>
+        <div class="shell">
+            <nav class="toc" id="toc" aria-label="Contents">
+                <a class="toc__home" href="../index.html">The whole map</a>
+                <p class="toc__group">Before your code runs</p>
+                <ol>
+                    <li>
+                        <a href="01-what-is-a-program.html"
+                            ><span class="n">01</span
+                            ><span>What a program is</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="02-how-a-cpu-runs-code.html"
+                            ><span class="n">02</span
+                            ><span>How a CPU runs code</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="03-programs-processes-and-the-kernel.html"
+                            ><span class="n">03</span
+                            ><span>Processes and the kernel</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Addresses</p>
+                <ol>
+                    <li>
+                        <a href="04-virtual-memory.html"
+                            ><span class="n">04</span
+                            ><span>Inside an address space</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="05-physical-ram-and-address-translation.html"
+                            aria-current="page"
+                            ><span class="n">05</span
+                            ><span>From virtual address to RAM</span></a
+                        >
+                        <ol class="toc__sub">
+                            <li class="lv2">
+                                <a href="#pages-and-frames">Pages and frames</a>
+                            </li>
+                            <li class="lv2">
+                                <a href="#splitting-an-address-by-hand"
+                                    >Splitting an address by hand</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#the-page-table-and-the-mmu"
+                                    >The page table and the MMU</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#three-things-the-translator-shows"
+                                    >Three things the translator shows</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#where-this-leaves-the-program"
+                                    >Where this leaves the program</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#keep-h">What to remember</a>
+                            </li>
+                            <li class="lv2">
+                                <a href="#test-h">Check your understanding</a>
+                            </li>
+                        </ol>
+                    </li>
+                    <li>
+                        <a href="06-threads-and-their-stacks.html"
+                            ><span class="n">06</span
+                            ><span>Threads and their stacks</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="07-registers-caches-and-a-memory-read.html"
+                            ><span class="n">07</span
+                            ><span>Caches and one load</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Calls and data</p>
+                <ol>
+                    <li>
+                        <a href="08-function-calls-and-stack-frames.html"
+                            ><span class="n">08</span
+                            ><span>Calls and stack frames</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="09-rust-values-stack-heap-and-box.html"
+                            ><span class="n">09</span
+                            ><span>Values, stack, heap, Box</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="10-string-and-vec-memory.html"
+                            ><span class="n">10</span
+                            ><span>String and Vec</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Rust's rules</p>
+                <ol>
+                    <li>
+                        <a href="11-ownership-moves-clone-and-drop.html"
+                            ><span class="n">11</span
+                            ><span>Ownership, moves, drop</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            ><span class="n">12</span
+                            ><span>References and lifetimes</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="13-iterators-and-following-data.html"
+                            ><span class="n">13</span><span>Iterators</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="14-memory-bugs-and-rust-safety.html"
+                            ><span class="n">14</span
+                            ><span>Memory bugs and safety</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">All together</p>
+                <ol>
+                    <li>
+                        <a href="15-follow-one-example-end-to-end.html"
+                            ><span class="n">15</span
+                            ><span>One call, every layer</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Reference</p>
+                <ul class="toc__ref">
+                    <li><a href="../reference/glossary.html">Glossary</a></li>
+                    <li><a href="../reference/sources.html">Sources</a></li>
+                    <li>
+                        <a href="../reference/concept-map.html">Concept map</a>
+                    </li>
+                </ul>
+            </nav>
+            <main id="main">
+                <article class="page">
+                    <header class="opening">
+                        <div class="opening__meta">
+                            <span class="opening__num">05</span
+                            ><span class="tag tag-hw">CPU &amp; hardware</span>
+                            <span class="tag tag-os">Operating system</span>
+                        </div>
+                        <h1>How does a virtual address reach physical RAM?</h1>
+                        <p class="why">
+                            The
+                            <a href="04-virtual-memory.html"
+                                >addresses a process uses</a
+                            >
+                            are virtual: by themselves, they name nothing in the
+                            RAM chips. On every memory access, hardware connects
+                            the virtual address to a place in real memory.
+                        </p>
+                    </header>
+                    <ul
+                        class="legend"
+                        aria-label="Which layer each colour means"
+                    >
+                        <li><span class="sw sw-rust"></span>Rust language</li>
+                        <li>
+                            <span class="sw sw-comp"></span>Compiler &amp;
+                            runtime library
+                        </li>
+                        <li><span class="sw sw-os"></span>Operating system</li>
+                        <li>
+                            <span class="sw sw-hw"></span>CPU &amp; hardware
+                        </li>
+                    </ul>
+                    <p>
+                        <a
+                            href="https://en.wikipedia.org/wiki/Random-access_memory"
+                            class="ext"
+                            >Physical RAM</a
+                        >
+                        <span class="tag tag-hw">Hardware</span> is the actual
+                        memory hardware. It has
+                        <span class="term">physical addresses</span>, which
+                        select real storage. The program never uses them. It
+                        uses virtual addresses, and hardware in the CPU
+                        translates each one to a physical address before the
+                        access happens
+                        <a
+                            class="src"
+                            href="https://developer.arm.com/-/media/Arm%20Developer%20Community/PDF/Learn%20the%20Architecture/LearnTheArchitecture-MemoryManagement-101811_0100_00_en.pdf"
+                            >Arm memory management guide</a
+                        >.
+                    </p>
+                    <p>
+                        Translating every byte separately would need an enormous
+                        table. So translation works on fixed-size blocks.
+                    </p>
+
+                    <h2 id="pages-and-frames">Pages and frames</h2>
+                    <p>
+                        The kernel treats physical RAM as a row of equal blocks
+                        called <span class="term">page frames</span>
+                        <a
+                            class="src"
+                            href="https://www.kernel.org/doc/html/latest/admin-guide/mm/concepts.html"
+                            >kernel docs</a
+                        >. The virtual address space is cut into blocks of the
+                        same size, called
+                        <span class="term">virtual pages</span>. Translation
+                        maps a whole virtual page onto a whole frame. Dividing
+                        memory this way is called
+                        <a
+                            href="https://en.wikipedia.org/wiki/Paging"
+                            class="ext"
+                            >paging</a
+                        >. The size depends on the architecture. 4096 bytes is
+                        the most common, and it is the size on the machine the
+                        examples were run on; Arm also supports 16 KiB and 64
+                        KiB, and both x86-64 and Arm can use much larger "huge"
+                        pages.
+                    </p>
+                    <p>
+                        Because a page and a frame are the same size, a byte's
+                        position <em>inside</em> its page is the same as its
+                        position inside the frame. That position is the
+                        <span class="term">offset</span>. Translation only has
+                        to replace the page part of the address.
+                    </p>
+
+                    <h2 id="splitting-an-address-by-hand">
+                        Splitting an address by hand
+                    </h2>
+                    <p>
+                        The figure uses a tiny made-up machine so the numbers
+                        fit on screen: 16-bit addresses and 4096-byte pages.
+                        4096 is 2<sup>12</sup>, so the low 12 bits of an address
+                        are the offset, and the remaining top 4 bits are the
+                        <span class="term">virtual page number</span>. In
+                        hexadecimal each digit is 4 bits, which makes the split
+                        easy to see:
+                    </p>
+                    <pre>
+virtual address   0x5010   =  0101 0000 0001 0000
+                               ────  ──────────────
+                               page        offset
+                               0x5         0x010   (byte 16 of the page)</pre
+                    >
+                    <p>
+                        If the page table says page 5 lives in frame 7, the
+                        physical address is frame 7 with the same offset:
+                        <code>0x7010</code>. Only the first digit changed. Real
+                        x86-64 addresses use 48 or 57 bits, so the page number
+                        is 36 or 45 bits long. The idea is exactly the same.
+                    </p>
+
+                    <h2 id="the-page-table-and-the-mmu">
+                        The page table and the MMU
+                    </h2>
+                    <p>
+                        A
+                        <a
+                            href="https://en.wikipedia.org/wiki/Page_table"
+                            class="ext"
+                            >page table</a
+                        >
+                        is a data structure, kept in memory by the kernel
+                        <span class="tag tag-os">OS</span>, with one entry per
+                        virtual page. Each entry records:
+                    </p>
+                    <ul>
+                        <li>whether the page is <b>mapped</b> at all;</li>
+                        <li>
+                            whether it is currently <b>present</b> in RAM, and
+                            if so, <b>which frame</b>;
+                        </li>
+                        <li>what is <b>allowed</b>: read, write, execute.</li>
+                    </ul>
+                    <p>
+                        Each process has its own page table. When the scheduler
+                        switches to a thread of another process, the kernel
+                        tells the hardware to use that process's table.
+                    </p>
+                    <p>
+                        The
+                        <a
+                            href="https://en.wikipedia.org/wiki/Memory_management_unit"
+                            class="ext"
+                            >MMU</a
+                        >
+                        (memory management unit) is the hardware that uses the
+                        table <span class="tag tag-hw">Hardware</span>. On every
+                        load, store and instruction fetch it takes the page
+                        number, finds the entry, checks the permissions and
+                        builds the physical address. The kernel writes the
+                        tables; the MMU reads them. The kernel is not involved
+                        in a normal access at all.
+                    </p>
+                    <p>
+                        Reading the table from memory on every access would be
+                        slow, so the MMU keeps a small cache of recent
+                        translations: the
+                        <a
+                            href="https://en.wikipedia.org/wiki/Translation_lookaside_buffer"
+                            class="ext"
+                            >TLB</a
+                        >, or translation lookaside buffer
+                        <a
+                            class="src"
+                            href="https://www.kernel.org/doc/html/latest/admin-guide/mm/concepts.html"
+                            >kernel docs</a
+                        >. If the translation is in the TLB, no table lookup is
+                        needed. If not, the hardware walks the page table and
+                        stores the result in the TLB for next time
+                        <a
+                            class="src"
+                            href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-tlbs.pdf"
+                            >OSTEP ch. 19</a
+                        >. The TLB holds translations only, never data.
+                    </p>
+
+                    <figure
+                        class="fig"
+                        data-fig="translate"
+                        data-label="address translator"
+                    >
+                        <div class="fig__head">
+                            <p class="fig__title">Translate an address</p>
+                            <span class="fig__kind"
+                                >Toy machine · 16-bit addresses · 4 KiB pages ·
+                                16 frames</span
+                            >
+                        </div>
+
+                        <div class="controls">
+                            <span class="controls__label">Process</span>
+                            <div class="seg" data-choice="proc">
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="A"
+                                    aria-pressed="true"
+                                >
+                                    A
+                                </button>
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="B"
+                                >
+                                    B
+                                </button>
+                            </div>
+                            <span class="controls__sep"></span>
+                            <span class="controls__label">Access</span>
+                            <div class="seg" data-choice="kind">
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="read"
+                                    aria-pressed="true"
+                                >
+                                    read
+                                </button>
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="write"
+                                >
+                                    write
+                                </button>
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="exec"
+                                >
+                                    execute
+                                </button>
+                            </div>
+                        </div>
+                        <div class="controls">
+                            <label class="controls__label" for="va-input"
+                                >Virtual address</label
+                            >
+                            <input
+                                class="addr"
+                                id="va-input"
+                                value="0x5010"
+                                spellcheck="false"
+                                autocomplete="off"
+                                aria-describedby="va-help"
+                            />
+                            <button class="btn btn--main" type="button" data-go>
+                                Translate
+                            </button>
+                            <span class="controls__sep"></span>
+                            <span class="controls__label">Try</span>
+                            <button
+                                class="btn"
+                                type="button"
+                                data-try="0x5010 read"
+                            >
+                                data
+                            </button>
+                            <button
+                                class="btn"
+                                type="button"
+                                data-try="0x1234 exec"
+                            >
+                                code
+                            </button>
+                            <button
+                                class="btn"
+                                type="button"
+                                data-try="0x1234 write"
+                            >
+                                write to code
+                            </button>
+                            <button
+                                class="btn"
+                                type="button"
+                                data-try="0x6100 write"
+                            >
+                                never touched
+                            </button>
+                            <button
+                                class="btn"
+                                type="button"
+                                data-try="0x0008 read"
+                            >
+                                address near 0
+                            </button>
+                        </div>
+                        <p id="va-help" class="note-sm js-only">
+                            Four hex digits, from 0x0000 to 0xFFFF. The first
+                            digit is the page number.
+                        </p>
+
+                        <div class="xl">
+                            <div class="xl__addr">
+                                <div class="xl__split">
+                                    <div
+                                        class="bits"
+                                        aria-label="virtual address split"
+                                    >
+                                        <span class="vpn" data-out="vpn">5</span
+                                        ><span class="off" data-out="off"
+                                            >010</span
+                                        >
+                                    </div>
+                                    <div class="bits-cap">
+                                        <span>page</span><span>offset</span>
+                                    </div>
+                                </div>
+                                <div class="xl__arrow" aria-hidden="true">
+                                    →
+                                </div>
+                                <div class="xl__split">
+                                    <div
+                                        class="bits"
+                                        aria-label="physical address"
+                                    >
+                                        <span class="pfn" data-out="pfn">7</span
+                                        ><span class="off" data-out="off2"
+                                            >010</span
+                                        >
+                                    </div>
+                                    <div class="bits-cap">
+                                        <span>frame</span
+                                        ><span>offset (unchanged)</span>
+                                    </div>
+                                </div>
+                                <p class="note-sm xl__res" data-out="result">
+                                    Process A, read 0x5010 → physical 0x7010
+                                </p>
+                            </div>
+
+                            <div class="xl__result">
+                                <div class="controls js-only">
+                                    <button class="btn" type="button" data-back>
+                                        ← Back
+                                    </button>
+                                    <button
+                                        class="btn btn--main"
+                                        type="button"
+                                        data-next
+                                    >
+                                        Next →
+                                    </button>
+                                    <button
+                                        class="btn"
+                                        type="button"
+                                        data-reset
+                                    >
+                                        Reset machine
+                                    </button>
+                                    <span class="counter" data-counter></span>
+                                </div>
+                                <p class="now-says" aria-live="polite" data-say>
+                                    Choose a process and an address, then press
+                                    Translate.
+                                </p>
+                                <ol class="steps">
+                                    <li>
+                                        Process A reads <code>0x5010</code>.
+                                        Split it: page <code>5</code>, offset
+                                        <code>0x010</code>.
+                                    </li>
+                                    <li>
+                                        The MMU checks the TLB for (A, page 5).
+                                        Not there: a TLB miss.
+                                    </li>
+                                    <li>
+                                        The hardware reads entry 5 of A's page
+                                        table: present, frame 7, read and write
+                                        allowed.
+                                    </li>
+                                    <li>
+                                        A read is allowed. The translation (A, 5
+                                        → 7) is saved in the TLB.
+                                    </li>
+                                    <li>
+                                        Physical address = frame 7 with the same
+                                        offset: <code>0x7010</code>. Process B
+                                        reading <code>0x5010</code> would get
+                                        frame 12 instead.
+                                    </li>
+                                </ol>
+                            </div>
+
+                            <div>
+                                <div class="tlb-wrap">
+                                    <h4>
+                                        <span>TLB · recent translations</span
+                                        ><span class="tag tag-hw">MMU</span>
+                                    </h4>
+                                    <table class="tlb" aria-label="TLB entries">
+                                        <thead>
+                                            <tr>
+                                                <th>process</th>
+                                                <th>page</th>
+                                                <th>frame</th>
+                                                <th>allowed</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody data-tlb>
+                                            <tr>
+                                                <td>A</td>
+                                                <td>1</td>
+                                                <td>3</td>
+                                                <td>r-x</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="ptab-wrap">
+                                    <h4>
+                                        <span data-out="ptname"
+                                            >Page table of process A</span
+                                        ><span class="tag tag-os"
+                                            >kernel writes · MMU reads</span
+                                        >
+                                    </h4>
+                                    <table class="ptab" aria-label="Page table">
+                                        <thead>
+                                            <tr>
+                                                <th>page</th>
+                                                <th>state</th>
+                                                <th>frame</th>
+                                                <th>allowed</th>
+                                                <th>used for</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody data-ptab>
+                                            <tr>
+                                                <td>0</td>
+                                                <td class="inv">not mapped</td>
+                                                <td></td>
+                                                <td></td>
+                                                <td>left empty on purpose</td>
+                                            </tr>
+                                            <tr>
+                                                <td>1</td>
+                                                <td>present</td>
+                                                <td>3</td>
+                                                <td>r-x</td>
+                                                <td>code (shared)</td>
+                                            </tr>
+                                            <tr>
+                                                <td>2</td>
+                                                <td>present</td>
+                                                <td>6</td>
+                                                <td>r--</td>
+                                                <td>read-only data</td>
+                                            </tr>
+                                            <tr>
+                                                <td>3</td>
+                                                <td class="inv">not mapped</td>
+                                                <td></td>
+                                                <td></td>
+                                                <td></td>
+                                            </tr>
+                                            <tr>
+                                                <td>4</td>
+                                                <td>present</td>
+                                                <td>9</td>
+                                                <td>rw-</td>
+                                                <td>
+                                                    heap:
+                                                    <code>scores</code> buffer
+                                                </td>
+                                            </tr>
+                                            <tr class="is-now">
+                                                <td>5</td>
+                                                <td>present</td>
+                                                <td>7</td>
+                                                <td>rw-</td>
+                                                <td>data</td>
+                                            </tr>
+                                            <tr>
+                                                <td>6</td>
+                                                <td>mapped, not present</td>
+                                                <td>—</td>
+                                                <td>rw-</td>
+                                                <td>
+                                                    anonymous, never written
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>7–D</td>
+                                                <td class="inv">not mapped</td>
+                                                <td></td>
+                                                <td></td>
+                                                <td></td>
+                                            </tr>
+                                            <tr>
+                                                <td>E</td>
+                                                <td>present</td>
+                                                <td>2</td>
+                                                <td>rw-</td>
+                                                <td>main thread stack</td>
+                                            </tr>
+                                            <tr>
+                                                <td>F</td>
+                                                <td class="inv">not mapped</td>
+                                                <td></td>
+                                                <td></td>
+                                                <td></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="ramgrid-wrap">
+                                <h4>
+                                    <span
+                                        >Physical RAM · 16 frames of 4 KiB</span
+                                    ><span class="tag tag-hw">RAM</span>
+                                </h4>
+                                <div class="ramgrid" data-ram>
+                                    <div class="rf">
+                                        <span class="fn">frame 0</span>free
+                                    </div>
+                                    <div class="rf b">
+                                        <span class="fn">frame 1</span>B: heap
+                                    </div>
+                                    <div class="rf a">
+                                        <span class="fn">frame 2</span>A: stack
+                                    </div>
+                                    <div class="rf ab">
+                                        <span class="fn">frame 3</span>code
+                                    </div>
+                                    <div class="rf">
+                                        <span class="fn">frame 4</span>free
+                                    </div>
+                                    <div class="rf">
+                                        <span class="fn">frame 5</span>free
+                                    </div>
+                                    <div class="rf ab">
+                                        <span class="fn">frame 6</span>read-only
+                                        data
+                                    </div>
+                                    <div class="rf a is-now">
+                                        <span class="fn">frame 7</span>A: data
+                                    </div>
+                                    <div class="rf">
+                                        <span class="fn">frame 8</span>free
+                                    </div>
+                                    <div class="rf a">
+                                        <span class="fn">frame 9</span>A: heap
+                                    </div>
+                                    <div class="rf">
+                                        <span class="fn">frame 10</span>free
+                                    </div>
+                                    <div class="rf">
+                                        <span class="fn">frame 11</span>free
+                                    </div>
+                                    <div class="rf b">
+                                        <span class="fn">frame 12</span>B: data
+                                    </div>
+                                    <div class="rf k">
+                                        <span class="fn">frame 13</span>B's page
+                                        table
+                                    </div>
+                                    <div class="rf b">
+                                        <span class="fn">frame 14</span>B: stack
+                                    </div>
+                                    <div class="rf k">
+                                        <span class="fn">frame 15</span>A's page
+                                        table
+                                    </div>
+                                </div>
+                                <p class="note-sm ramkey">
+                                    Top edge: <i class="k-a"></i> used by A ·
+                                    <i class="k-b"></i> used by B ·
+                                    <i class="k-ab"></i> shared by both ·
+                                    <i class="k-k"></i> kernel. Neighbouring
+                                    pages land in scattered frames.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="leaves-out leaves-out--below">
+                            <h4>What this picture leaves out</h4>
+                            <ul>
+                                <li>
+                                    Real page tables are trees with several
+                                    levels (four on most x86-64 Linux systems,
+                                    five on some), so that a mostly empty
+                                    address space needs only a small table.
+                                </li>
+                                <li>
+                                    Real TLBs have dozens to thousands of
+                                    entries, often in levels. Some CPUs tag
+                                    entries by process (Arm calls the tag an
+                                    ASID); others flush them on a process
+                                    switch.
+                                </li>
+                                <li>
+                                    A write fault on a page shared after
+                                    <code>fork</code> can be legal: the kernel
+                                    makes a private copy (copy-on-write) and
+                                    retries. The toy only shows plain permission
+                                    errors.
+                                </li>
+                                <li>
+                                    Most page-table walks are done by hardware;
+                                    a few architectures let the kernel handle
+                                    TLB misses in software.
+                                </li>
+                            </ul>
+                        </div>
+                    </figure>
+
+                    <h2 id="three-things-the-translator-shows">
+                        Three things the translator shows
+                    </h2>
+                    <p>
+                        <b
+                            >Neighbours in virtual memory are not neighbours in
+                            RAM.</b
+                        >
+                        In process A, pages 4, 5 and 6 sit next to each other,
+                        but they use frames 9, 7 and whatever frame the kernel
+                        picks later. The program sees one continuous range of
+                        addresses. The RAM behind it can be scattered anywhere.
+                        This is how the kernel can hand out memory in any free
+                        frame without moving anything.
+                    </p>
+                    <p>
+                        <b>The same address, different memory.</b> Switch to
+                        process B and translate <code>0x5010</code> again. B's
+                        table sends page 5 to frame 12. This is how
+                        <a href="03-programs-processes-and-the-kernel.html"
+                            >processes</a
+                        >
+                        stay separate: each one has its own table.
+                    </p>
+                    <p>
+                        Page 1, the code, maps to frame 3 in both processes.
+                        Read-only code is shared on purpose.
+                    </p>
+                    <p>
+                        <b>A fault is not always an error.</b> Try "never
+                        touched". Page 6 is part of a mapping but has never been
+                        written, so it has no frame yet.
+                    </p>
+                    <p>
+                        The MMU cannot translate it, so it raises a
+                        <a
+                            href="https://en.wikipedia.org/wiki/Page_fault"
+                            class="ext"
+                            >page fault</a
+                        >: the CPU stops the instruction and runs the kernel.
+                        The kernel looks up the address in the process's list of
+                        mappings and sees that it is legal. It gives the page a
+                        zero-filled frame, updates the page table, and lets the
+                        instruction run again. The program never notices.
+                    </p>
+                    <p>
+                        This is <span class="term">demand paging</span>, the
+                        effect measured in a
+                        <a href="04-virtual-memory.html">real process</a>. The
+                        same path brings back pages that were moved out to swap,
+                        or reads in pages of a mapped file.
+                    </p>
+                    <p>
+                        Now try "address near 0" or "write to code". Here the
+                        kernel finds that the access is not legal: no mapping
+                        covers page 0, and page 1 does not allow writes. It
+                        sends the process the signal <code>SIGSEGV</code>, and
+                        by default the process ends with "Segmentation fault"
+                        <a
+                            class="src"
+                            href="https://man7.org/linux/man-pages/man2/mmap.2.html"
+                            >mmap(2)</a
+                        >. Same hardware event, different verdict: the kernel
+                        decides
+                        <a
+                            class="src"
+                            href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-beyondphys.pdf"
+                            >OSTEP ch. 21</a
+                        >.
+                    </p>
+
+                    <div class="aside aside--wrong">
+                        <p class="aside__h">
+                            Two tempting pictures that are wrong
+                        </p>
+                        <p>
+                            "The TLB is another name for the cache." The TLB
+                            caches <em>translations</em> (page → frame). The
+                            <a href="07-registers-caches-and-a-memory-read.html"
+                                >data caches</a
+                            >
+                            hold copies of <em>memory contents</em>. A single
+                            load can use both, for different jobs.
+                        </p>
+                        <p>
+                            "A page fault means the program crashed." Most page
+                            faults are normal and invisible: first use of a
+                            page, a page coming back from swap, a file being
+                            read in. Only faults the kernel cannot justify
+                            become a crash.
+                        </p>
+                    </div>
+
+                    <h2 id="where-this-leaves-the-program">
+                        Where this leaves the program
+                    </h2>
+                    <p>
+                        Every address a Rust program uses, whether a stack slot,
+                        a <code>Vec</code> buffer or an instruction, goes
+                        through this translation. Rust knows nothing about it.
+                        The compiler emits instructions with virtual addresses,
+                        the kernel keeps the tables, and the MMU does the work
+                        on every access. Together they give each process a
+                        large, private, continuous-looking memory, built from
+                        scattered frames that may not even be in RAM yet.
+                    </p>
+
+                    <section class="keep" aria-labelledby="keep-h">
+                        <h2 id="keep-h">What to remember</h2>
+                        <ol>
+                            <li>
+                                A virtual address is a page number plus an
+                                offset; translation swaps the page number for a
+                                frame number and keeps the offset.
+                            </li>
+                            <li>
+                                The kernel writes each process's page table; the
+                                MMU reads it on every access, using the TLB to
+                                remember recent translations.
+                            </li>
+                            <li>
+                                A page fault hands control to the kernel, which
+                                either fixes the mapping and retries or stops
+                                the process.
+                            </li>
+                        </ol>
+                    </section>
+
+                    <section class="test" aria-labelledby="test-h">
+                        <h2 id="test-h">Check your understanding</h2>
+                        <details>
+                            <summary>
+                                With 4 KiB pages, what is the offset of the
+                                address <code>0x4A38</code>, and which page is
+                                it on?
+                            </summary>
+                            <div>
+                                <p>
+                                    The low 12 bits are the offset:
+                                    <code>0xA38</code>. The rest is the page
+                                    number: <code>0x4</code>. In the toy
+                                    machine, page 4 of process A is in frame 9,
+                                    so the physical address is
+                                    <code>0x9A38</code>.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                What is the difference between a TLB miss and a
+                                page fault?
+                            </summary>
+                            <div>
+                                <p>
+                                    A TLB miss means the translation was not
+                                    cached; the hardware reads the page table
+                                    and carries on. A page fault means the page
+                                    table itself cannot give a usable
+                                    translation, so the kernel must step in.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                Do the pages of a 1 MiB <code>Vec</code> buffer
+                                have to sit in neighbouring frames?
+                            </summary>
+                            <div>
+                                <p>
+                                    No. The buffer is contiguous in virtual
+                                    memory, which is what Rust guarantees and
+                                    what the program sees. Each of its pages can
+                                    be in any frame, or not in RAM at all yet.
+                                </p>
+                            </div>
+                        </details>
+                    </section>
+
+                    <p class="related">
+                        <b>Related:</b>
+                        <a href="04-virtual-memory.html"
+                            >the memory map of a real process</a
+                        >
+                        ·
+                        <a href="07-registers-caches-and-a-memory-read.html"
+                            >the TLB on the path of one load</a
+                        >
+                        ·
+                        <a href="14-memory-bugs-and-rust-safety.html"
+                            >what happens when code goes outside its memory</a
+                        >
+                    </p>
+
+                    <p>
+                        <b>Next question:</b> a process's memory map can hold
+                        more than one stack.
+                        <a href="06-threads-and-their-stacks.html"
+                            >When one process has two threads, what do they
+                            share, and what does each keep to itself?</a
+                        >
+                    </p>
+                    <nav class="pager" aria-label="Previous and next">
+                        <a
+                            class="pager__prev"
+                            href="04-virtual-memory.html"
+                            rel="prev"
+                            ><span class="pager__dir">← Previous</span
+                            ><span class="pager__q"
+                                >What is inside a process's address space?</span
+                            ></a
+                        >
+                        <a
+                            class="pager__next"
+                            href="06-threads-and-their-stacks.html"
+                            rel="next"
+                            ><span class="pager__dir">Next →</span
+                            ><span class="pager__q"
+                                >What do threads share, and what does each keep
+                                to itself?</span
+                            ></a
+                        >
+                    </nav>
+                </article>
+                <footer class="foot">
+                    <p>
+                        Observed values, such as addresses, sizes, assembly and
+                        program output, come from one machine. It runs Linux 7.0
+                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
+                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
+                        limit. Addresses change on every run, and other systems,
+                        toolchains and allocators can differ. Details:
+                        <a href="../reference/sources.html">Sources</a> ·
+                        <code>examples/OUTPUT.txt</code>.
+                    </p>
+                </footer>
+            </main>
+            <nav class="otp" aria-label="On this page">
+                <p class="otp__h">On this page</p>
+                <ol class="otp__list">
+                    <li class="lv2">
+                        <a href="#pages-and-frames">Pages and frames</a>
+                    </li>
+                    <li class="lv2">
+                        <a href="#splitting-an-address-by-hand"
+                            >Splitting an address by hand</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#the-page-table-and-the-mmu"
+                            >The page table and the MMU</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#three-things-the-translator-shows"
+                            >Three things the translator shows</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#where-this-leaves-the-program"
+                            >Where this leaves the program</a
+                        >
+                    </li>
+                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
+                    <li class="lv2">
+                        <a href="#test-h">Check your understanding</a>
+                    </li>
+                </ol>
+            </nav>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,2614 @@
+<!doctype html>
+<html lang="en" class="no-js">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Sources — How a Rust program meets the machine</title>
+        <meta
+            name="description"
+            content="Every source behind the explanations, the claim each one supports, its caveats, and the results observed on the test machine."
+        />
+        <link rel="stylesheet" href="../assets/css/site.css" />
+        <script src="../assets/js/site.js"></script>
+        <script src="../assets/js/diagrams.js" defer></script>
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to the text</a>
+        <header class="top">
+            <a class="top__title" href="../index.html"
+                >How a Rust program meets the machine</a
+            >
+            <span class="top__here">Sources</span>
+            <span class="top__spacer"></span>
+            <button
+                class="top__btn"
+                type="button"
+                data-toc-toggle
+                aria-expanded="false"
+                aria-controls="toc"
+            >
+                Contents
+            </button>
+        </header>
+        <div class="shell">
+            <nav class="toc" id="toc" aria-label="Contents">
+                <a class="toc__home" href="../index.html">The whole map</a>
+                <p class="toc__group">Before your code runs</p>
+                <ol>
+                    <li>
+                        <a href="../lessons/01-what-is-a-program.html"
+                            ><span class="n">01</span
+                            ><span>What a program is</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="../lessons/02-how-a-cpu-runs-code.html"
+                            ><span class="n">02</span
+                            ><span>How a CPU runs code</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="../lessons/03-programs-processes-and-the-kernel.html"
+                            ><span class="n">03</span
+                            ><span>Processes and the kernel</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Addresses</p>
+                <ol>
+                    <li>
+                        <a href="../lessons/04-virtual-memory.html"
+                            ><span class="n">04</span
+                            ><span>Inside an address space</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="../lessons/05-physical-ram-and-address-translation.html"
+                            ><span class="n">05</span
+                            ><span>From virtual address to RAM</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="../lessons/06-threads-and-their-stacks.html"
+                            ><span class="n">06</span
+                            ><span>Threads and their stacks</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="../lessons/07-registers-caches-and-a-memory-read.html"
+                            ><span class="n">07</span
+                            ><span>Caches and one load</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Calls and data</p>
+                <ol>
+                    <li>
+                        <a
+                            href="../lessons/08-function-calls-and-stack-frames.html"
+                            ><span class="n">08</span
+                            ><span>Calls and stack frames</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="../lessons/09-rust-values-stack-heap-and-box.html"
+                            ><span class="n">09</span
+                            ><span>Values, stack, heap, Box</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="../lessons/10-string-and-vec-memory.html"
+                            ><span class="n">10</span
+                            ><span>String and Vec</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Rust's rules</p>
+                <ol>
+                    <li>
+                        <a
+                            href="../lessons/11-ownership-moves-clone-and-drop.html"
+                            ><span class="n">11</span
+                            ><span>Ownership, moves, drop</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="../lessons/12-references-borrowing-and-lifetimes.html"
+                            ><span class="n">12</span
+                            ><span>References and lifetimes</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="../lessons/13-iterators-and-following-data.html"
+                            ><span class="n">13</span><span>Iterators</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="../lessons/14-memory-bugs-and-rust-safety.html"
+                            ><span class="n">14</span
+                            ><span>Memory bugs and safety</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">All together</p>
+                <ol>
+                    <li>
+                        <a
+                            href="../lessons/15-follow-one-example-end-to-end.html"
+                            ><span class="n">15</span
+                            ><span>One call, every layer</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Reference</p>
+                <ul class="toc__ref">
+                    <li><a href="../reference/glossary.html">Glossary</a></li>
+                    <li>
+                        <a href="../reference/sources.html" aria-current="page"
+                            >Sources</a
+                        >
+                        <ol class="toc__sub">
+                            <li class="lv2">
+                                <a href="#machine-used-for-observed-results"
+                                    >Machine used for observed results</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#rust-language-and-standard-library"
+                                    >Rust — language and standard library</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#linux-and-operating-systems"
+                                    >Linux and operating systems</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#cpu-and-memory-hardware"
+                                    >CPU and memory hardware</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#observed-on-the-machine-above"
+                                    >Observed on the machine above</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#secondary-reading-not-used-as-proof"
+                                    >Secondary reading (not used as proof)</a
+                                >
+                            </li>
+                        </ol>
+                    </li>
+                    <li>
+                        <a href="../reference/concept-map.html">Concept map</a>
+                    </li>
+                </ul>
+            </nav>
+            <main id="main">
+                <article class="page">
+                    <div class="refdoc refdoc--sources">
+                        <header class="opening">
+                            <div class="opening__meta">
+                                <span class="opening__num">Reference</span>
+                            </div>
+                            <h1>Sources</h1>
+                        </header>
+                        <ul
+                            class="legend"
+                            aria-label="Which layer each colour means"
+                        >
+                            <li>
+                                <span class="sw sw-rust"></span>Rust language
+                            </li>
+                            <li>
+                                <span class="sw sw-comp"></span>Compiler &amp;
+                                runtime library
+                            </li>
+                            <li>
+                                <span class="sw sw-os"></span>Operating system
+                            </li>
+                            <li>
+                                <span class="sw sw-hw"></span>CPU &amp; hardware
+                            </li>
+                        </ul>
+                        <p>
+                            Every technical claim in the explanations traces to
+                            an entry here. Each entry gives the source, the
+                            passage relied on (quoted where short), what kind of
+                            claim it is, and any caveat that has to be shown
+                            next to the claim.
+                        </p>
+                        <p>
+                            <strong>Kinds of claim:</strong>
+                            <em>Language guarantee</em> (Rust promises it) ·
+                            <em>Library guarantee</em> (documented
+                            <code>std</code> behaviour) ·
+                            <em>Documented OS behaviour</em> (Linux docs or man
+                            pages) · <em>Architecture</em> (CPU vendor docs) ·
+                            <em>Common hardware behaviour</em> (true of typical
+                            designs, not promised) · <em>Observed</em> (measured
+                            on the machine below; may differ elsewhere) ·
+                            <em>Teaching simplification</em>.
+                        </p>
+                        <p>
+                            All sources were opened and read on 2026-10-14.
+                            Quotes are copied from the source documents as they
+                            read on that date.
+                        </p>
+                        <h2 id="machine-used-for-observed-results">
+                            Machine used for observed results
+                        </h2>
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Toolchain</td>
+                                        <td>
+                                            <code
+                                                >rustc 1.98.1 (48a229cea
+                                                2026-09-01)</code
+                                            >
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Target</td>
+                                        <td>
+                                            <code
+                                                >x86_64-unknown-linux-gnu</code
+                                            >
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>OS</td>
+                                        <td>Linux 7.0 (Ubuntu), glibc</td>
+                                    </tr>
+                                    <tr>
+                                        <td>CPU</td>
+                                        <td>
+                                            12th Gen Intel Core i5-12450H (4
+                                            performance + 4 efficiency cores)
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Page size</td>
+                                        <td>
+                                            4096 (<code>getconf PAGESIZE</code>)
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Main-thread stack limit</td>
+                                        <td>
+                                            8192 KiB (<code>ulimit -s</code>)
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p>
+                            Run <code>sh examples/run-all.sh</code> to
+                            reproduce; it writes
+                            <code>examples/OUTPUT.txt</code>.
+                        </p>
+                        <hr />
+                        <h2 id="rust-language-and-standard-library">
+                            Rust — language and standard library
+                        </h2>
+                        <p class="entry">
+                            <span id="R-OWN"></span
+                            ><strong
+                                ><a class="sid" href="#R-OWN"
+                                    >[R-OWN]</a
+                                ></strong
+                            >
+                            The Rust Programming Language, §4.1 "What Is
+                            Ownership?" —
+                            <a
+                                href="https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html"
+                                >https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                Ownership rules: "Each value in Rust has an
+                                <em>owner</em>. There can only be one owner at a
+                                time. When the owner goes out of scope, the
+                                value will be dropped." —
+                                <em>Language guarantee.</em>
+                            </li>
+                            <li>
+                                Stack: "The stack stores values in the order it
+                                gets them and removes the values in the opposite
+                                order." — <em>Teaching model</em> (the Book's
+                                own intro).
+                            </li>
+                            <li>
+                                Allocator: "The memory allocator finds an empty
+                                spot in the heap that is big enough, marks it as
+                                being in use, and returns a <em>pointer</em>." —
+                                <em>Teaching model.</em>
+                            </li>
+                            <li>
+                                Function calls: "the values passed into the
+                                function … and the function's local variables
+                                get pushed onto the stack." —
+                                <strong
+                                    >Caveat used in
+                                    <a
+                                        href="../lessons/08-function-calls-and-stack-frames.html"
+                                        >Calls and stack frames</a
+                                    >
+                                    and
+                                    <a
+                                        href="../lessons/09-rust-values-stack-heap-and-box.html"
+                                        >Values, stack, heap, Box</a
+                                    >:</strong
+                                >
+                                the Book is describing a conceptual model;
+                                optimised code may keep these in registers (see
+                                <a class="sid" href="#RUN-ASM">[RUN-ASM]</a>).
+                            </li>
+                            <li>
+                                <code>String</code> parts: "a pointer to the
+                                memory that holds the contents of the string, a
+                                length, and a capacity." Length and capacity are
+                                in bytes. — <em>Library behaviour.</em>
+                            </li>
+                            <li>
+                                Move: "we copy the pointer, the length, and the
+                                capacity that are on the stack. We do not copy
+                                the data on the heap"; "Rust considers
+                                <code>s1</code> as no longer valid." —
+                                <em>Language guarantee</em> (ownership),
+                                <em>teaching model</em> (where the handle
+                                lives).
+                            </li>
+                            <li>
+                                <code>clone</code>: "If we <em>do</em> want to
+                                deeply copy the heap data … we can use a common
+                                method called <code>clone</code>."
+                            </li>
+                            <li>
+                                Drop: "Rust calls
+                                <code>drop</code> automatically at the closing
+                                curly bracket."
+                            </li>
+                            <li>
+                                <code>Copy</code> types: integers,
+                                <code>bool</code>, floats, <code>char</code>,
+                                tuples of <code>Copy</code> types; "nothing that
+                                requires allocation or is some form of resource
+                                can implement <code>Copy</code>."
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="R-BORROW"></span
+                            ><strong
+                                ><a class="sid" href="#R-BORROW"
+                                    >[R-BORROW]</a
+                                ></strong
+                            >
+                            The Rust Programming Language, §4.2 "References and
+                            Borrowing" —
+                            <a
+                                href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html"
+                                >https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "A reference is like a pointer in that it's an
+                                address we can follow … Unlike a pointer, a
+                                reference is guaranteed to point to a valid
+                                value of a particular type for the life of that
+                                reference." —
+                                <em>Language guarantee (safe Rust).</em>
+                            </li>
+                            <li>
+                                "At any given time, you can have
+                                <em>either</em> one mutable reference
+                                <em>or</em> any number of immutable references."
+                                "References must always be valid."
+                            </li>
+                            <li>
+                                "a reference's scope starts from where it is
+                                introduced and continues through the last time
+                                that reference is used." — used for the borrow
+                                timeline in
+                                <a
+                                    href="../lessons/12-references-borrowing-and-lifetimes.html"
+                                    >References and lifetimes</a
+                                >.
+                            </li>
+                            <li>
+                                <code>dangle()</code> example and E0106 message.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="R-LIFETIMES"></span
+                            ><strong
+                                ><a class="sid" href="#R-LIFETIMES"
+                                    >[R-LIFETIMES]</a
+                                ></strong
+                            >
+                            The Rust Programming Language, §10.3 "Validating
+                            References with Lifetimes" —
+                            <a
+                                href="https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html"
+                                >https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "Lifetime annotations don't change how long any
+                                of the references live. Rather, they describe
+                                the relationships of the lifetimes of multiple
+                                references to each other." —
+                                <em>Language guarantee.</em>
+                            </li>
+                            <li>
+                                "The Rust compiler has a
+                                <em>borrow checker</em> that compares scopes to
+                                determine whether all borrows are valid."
+                            </li>
+                            <li>
+                                E0597 example (<code>r = &amp;x</code> inside an
+                                inner block).
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="STD-VEC"></span
+                            ><strong
+                                ><a class="sid" href="#STD-VEC"
+                                    >[STD-VEC]</a
+                                ></strong
+                            >
+                            <code>std::vec::Vec</code>, section "Guarantees" —
+                            <a
+                                href="https://doc.rust-lang.org/std/vec/struct.Vec.html"
+                                >https://doc.rust-lang.org/std/vec/struct.Vec.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "<code>Vec</code> is and always will be a
+                                (pointer, capacity, length) triplet. No more, no
+                                less. The order of these fields is completely
+                                unspecified." — <em>Library guarantee.</em>
+                                <strong
+                                    >Caveat in
+                                    <a
+                                        href="../lessons/10-string-and-vec-memory.html"
+                                        >String and Vec</a
+                                    >:</strong
+                                >
+                                the ptr/len/cap drawing is a teaching layout,
+                                not a byte order.
+                            </li>
+                            <li>
+                                "if you construct a <code>Vec</code> with
+                                capacity 0 via <code>Vec::new</code>,
+                                <code>vec![]</code> … it will not allocate
+                                memory." — <em>Library guarantee.</em>
+                            </li>
+                            <li>
+                                "its pointer points to
+                                <code>len</code> initialized, contiguous
+                                elements in order … followed by
+                                <code>capacity - len</code> logically
+                                uninitialized, contiguous elements." —
+                                <em>Library guarantee.</em>
+                            </li>
+                            <li>
+                                "<code>push</code> and <code>insert</code> will
+                                never (re)allocate if the reported capacity is
+                                sufficient. <code>push</code> and
+                                <code>insert</code> <em>will</em> (re)allocate
+                                if <code>len == capacity</code>." —
+                                <em>Library guarantee.</em>
+                            </li>
+                            <li>
+                                "<code>Vec</code> does not guarantee any
+                                particular growth strategy when reallocating
+                                when full." —
+                                <strong
+                                    >Caveat in
+                                    <a
+                                        href="../lessons/10-string-and-vec-memory.html"
+                                        >String and Vec</a
+                                    >:</strong
+                                >
+                                growing from 2 to 4 is what we observed, not a
+                                rule.
+                            </li>
+                            <li>
+                                "<code>vec![e_1, e_2, ..., e_n]</code> … produce
+                                a <code>Vec</code> that requests an allocation
+                                of the exact size needed for precisely
+                                <code>n</code> elements"; capacity "at least the
+                                requested capacity and not more than the
+                                allocated capacity." —
+                                <strong>Caveat:</strong> so
+                                <code>vec![10, 20]</code> <em>asks</em> for room
+                                for 2; <code>capacity()</code> reported 2 in our
+                                run.
+                            </li>
+                            <li>
+                                "the ABI is not stable and
+                                <code>Vec</code> makes no guarantees about its
+                                memory layout (including the order of fields)."
+                            </li>
+                            <li>
+                                "<code>Vec</code> will never automatically
+                                shrink itself." "Even if you drop a
+                                <code>Vec</code>, its buffer may simply be
+                                reused by another allocation."
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="STD-STRING"></span
+                            ><strong
+                                ><a class="sid" href="#STD-STRING"
+                                    >[STD-STRING]</a
+                                ></strong
+                            >
+                            <code>std::string::String</code> —
+                            <a
+                                href="https://doc.rust-lang.org/std/string/struct.String.html"
+                                >https://doc.rust-lang.org/std/string/struct.String.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>"A UTF-8–encoded, growable string."</li>
+                            <li>
+                                "A <code>String</code> is made up of three
+                                components: a pointer to some bytes, a length,
+                                and a capacity … The length is the number of
+                                bytes currently stored in the buffer, and the
+                                capacity is the size of the buffer in bytes."
+                                "This buffer is always stored on the heap." —
+                                <em>Library guarantee.</em>
+                            </li>
+                            <li>
+                                <code>len</code>: "Returns the length of this
+                                <code>String</code>, in bytes, not
+                                <code>char</code>s or graphemes."
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="STD-BOX"></span
+                            ><strong
+                                ><a class="sid" href="#STD-BOX"
+                                    >[STD-BOX]</a
+                                ></strong
+                            >
+                            <code>std::boxed</code> —
+                            <a
+                                href="https://doc.rust-lang.org/std/boxed/index.html"
+                                >https://doc.rust-lang.org/std/boxed/index.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "<code>Box&lt;T&gt;</code>, casually referred to
+                                as a 'box', provides the simplest form of heap
+                                allocation in Rust. Boxes provide ownership for
+                                this allocation, and drop their contents when
+                                they go out of scope."
+                            </li>
+                            <li>
+                                "For non-zero-sized values, a
+                                <code>Box</code> will use the
+                                <code>Global</code> allocator for its
+                                allocation."
+                            </li>
+                            <li>
+                                "So long as <code>T: Sized</code>, a
+                                <code>Box&lt;T&gt;</code> is guaranteed to be
+                                represented as a single pointer." —
+                                <em>Library guarantee.</em> Matches
+                                <a class="sid" href="#RUN-SIZES">[RUN-SIZES]</a>
+                                (8 bytes on x86-64).
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="STD-ALLOC"></span
+                            ><strong
+                                ><a class="sid" href="#STD-ALLOC"
+                                    >[STD-ALLOC]</a
+                                ></strong
+                            >
+                            <code>std::alloc</code> —
+                            <a
+                                href="https://doc.rust-lang.org/std/alloc/index.html"
+                                >https://doc.rust-lang.org/std/alloc/index.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "the standard library has one 'global' memory
+                                allocator that is used for example by
+                                <code>Box&lt;T&gt;</code> and
+                                <code>Vec&lt;T&gt;</code>." "Currently the
+                                default global allocator is unspecified." —
+                                <strong
+                                    >Caveat in
+                                    <a href="../lessons/04-virtual-memory.html"
+                                        >Inside an address space</a
+                                    >
+                                    and
+                                    <a
+                                        href="../lessons/09-rust-values-stack-heap-and-box.html"
+                                        >Values, stack, heap, Box</a
+                                    >:</strong
+                                >
+                                that it behaves like glibc
+                                <code>malloc</code> here is
+                                <em>observed</em> (<a
+                                    class="sid"
+                                    href="#RUN-MAPS"
+                                    >[RUN-MAPS]</a
+                                >), not promised.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="STD-ITER"></span
+                            ><strong
+                                ><a class="sid" href="#STD-ITER"
+                                    >[STD-ITER]</a
+                                ></strong
+                            >
+                            <code>std::iter</code> —
+                            <a
+                                href="https://doc.rust-lang.org/std/iter/index.html"
+                                >https://doc.rust-lang.org/std/iter/index.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "<code>iter()</code>, which iterates over
+                                <code>&amp;T</code>. <code>iter_mut()</code>,
+                                which iterates over <code>&amp;mut T</code>.
+                                <code>into_iter()</code>, which iterates over
+                                <code>T</code>."
+                            </li>
+                            <li>
+                                <code>for</code> loop desugaring into
+                                <code>IntoIterator::into_iter(values)</code> and
+                                repeated <code>next()</code>.
+                            </li>
+                            <li>
+                                "Iterators (and iterator adapters) are
+                                <em>lazy</em>."
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="STD-THREAD"></span
+                            ><strong
+                                ><a class="sid" href="#STD-THREAD"
+                                    >[STD-THREAD]</a
+                                ></strong
+                            >
+                            <code>std::thread</code>, section "Stack size" —
+                            <a
+                                href="https://doc.rust-lang.org/std/thread/index.html"
+                                >https://doc.rust-lang.org/std/thread/index.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "The default stack size is platform-dependent
+                                and subject to change. Currently, it is 2 MiB on
+                                all Tier-1 platforms." —
+                                <strong
+                                    >Caveat in
+                                    <a
+                                        href="../lessons/06-threads-and-their-stacks.html"
+                                        >Threads and their stacks</a
+                                    >:</strong
+                                >
+                                "currently", for spawned threads only.
+                            </li>
+                            <li>
+                                "Note that the stack size of the main thread is
+                                <em>not</em> determined by Rust."
+                            </li>
+                            <li>
+                                "When the main thread of a Rust program
+                                terminates, the entire program shuts down, even
+                                if other threads are still running."
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="STD-SLICE"></span
+                            ><strong
+                                ><a class="sid" href="#STD-SLICE"
+                                    >[STD-SLICE]</a
+                                ></strong
+                            >
+                            <code>slice::get</code> —
+                            <a
+                                href="https://doc.rust-lang.org/std/primitive.slice.html#method.get"
+                                >https://doc.rust-lang.org/std/primitive.slice.html#method.get</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "returns a reference to the element at that
+                                position or <code>None</code> if out of bounds."
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="REF-ARRAY"></span
+                            ><strong
+                                ><a class="sid" href="#REF-ARRAY"
+                                    >[REF-ARRAY]</a
+                                ></strong
+                            >
+                            The Rust Reference, "Array and slice indexing
+                            expressions" —
+                            <a
+                                href="https://doc.rust-lang.org/reference/expressions/array-expr.html"
+                                >https://doc.rust-lang.org/reference/expressions/array-expr.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "bounds can be checked at compile-time with a
+                                constant index value. Otherwise a check will be
+                                performed at run-time that will put the thread
+                                in a <em>panicked state</em> if it fails." —
+                                <em>Language guarantee.</em>
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="REF-MAIN"></span
+                            ><strong
+                                ><a class="sid" href="#REF-MAIN"
+                                    >[REF-MAIN]</a
+                                ></strong
+                            >
+                            The Rust Reference, "Crates and source files" → main
+                            functions —
+                            <a
+                                href="https://doc.rust-lang.org/reference/crates-and-source-files.html"
+                                >https://doc.rust-lang.org/reference/crates-and-source-files.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "A crate that contains a
+                                <code>main</code> function can be compiled to an
+                                executable." — The Reference does not describe
+                                what runs before <code>main</code>;
+                                <a href="../lessons/01-what-is-a-program.html"
+                                    >What a program is</a
+                                >
+                                uses
+                                <a class="sid" href="#RUN-ELF">[RUN-ELF]</a> for
+                                that.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="REF-DESTRUCTORS"></span
+                            ><strong
+                                ><a class="sid" href="#REF-DESTRUCTORS"
+                                    >[REF-DESTRUCTORS]</a
+                                ></strong
+                            >
+                            The Rust Reference, "Destructors" —
+                            <a
+                                href="https://doc.rust-lang.org/reference/destructors.html"
+                                >https://doc.rust-lang.org/reference/destructors.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "When an initialized variable or temporary goes
+                                out of scope, its <em>destructor</em> is run or
+                                it is <em>dropped</em>." Variables "are dropped
+                                in reverse order of declaration." The example
+                                notes "Uninitialized does not drop" — a
+                                moved-from binding is uninitialised. —
+                                <em>Language guarantee.</em>
+                            </li>
+                            <li>
+                                "<code>core::mem::forget</code> can be used to
+                                prevent the destructor of a variable from being
+                                run" —
+                                <a
+                                    href="../lessons/11-ownership-moves-clone-and-drop.html"
+                                    >Ownership, moves, drop</a
+                                >
+                                notes drop is not guaranteed in every case.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="REF-OVERFLOW"></span
+                            ><strong
+                                ><a class="sid" href="#REF-OVERFLOW"
+                                    >[REF-OVERFLOW]</a
+                                ></strong
+                            >
+                            The Rust Reference, "Overflow" —
+                            <a
+                                href="https://doc.rust-lang.org/reference/expressions/operator-expr.html#overflow"
+                                >https://doc.rust-lang.org/reference/expressions/operator-expr.html#overflow</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "Integer operators will panic when they overflow
+                                when compiled in debug mode." —
+                                <em>Language rule.</em> Explains the
+                                <code>jo</code> check in
+                                <a class="sid" href="#RUN-CALLS">[RUN-CALLS]</a
+                                >.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="STD-BLACKBOX"></span
+                            ><strong
+                                ><a class="sid" href="#STD-BLACKBOX"
+                                    >[STD-BLACKBOX]</a
+                                ></strong
+                            >
+                            <code>std::hint::black_box</code> —
+                            <a
+                                href="https://doc.rust-lang.org/std/hint/fn.black_box.html"
+                                >https://doc.rust-lang.org/std/hint/fn.black_box.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                An identity function that tells the compiler to
+                                be "maximally pessimistic" about what it could
+                                do, provided on a "best-effort" basis. —
+                                <em>Library documentation.</em> The examples use
+                                it so that results are not computed at compile
+                                time; it is not a guarantee.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="REF-LAYOUT"></span
+                            ><strong
+                                ><a class="sid" href="#REF-LAYOUT"
+                                    >[REF-LAYOUT]</a
+                                ></strong
+                            >
+                            The Rust Reference, "Type layout" —
+                            <a
+                                href="https://doc.rust-lang.org/reference/type-layout.html"
+                                >https://doc.rust-lang.org/reference/type-layout.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                <code>i32</code> has size 4. Default
+                                representation: "There are no other guarantees
+                                of data layout"; field order "does not have to
+                                be the same as the order in which the fields are
+                                specified." "Type layout can be changed with
+                                each compilation."
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="REF-UB"></span
+                            ><strong
+                                ><a class="sid" href="#REF-UB"
+                                    >[REF-UB]</a
+                                ></strong
+                            >
+                            The Rust Reference, "Behavior considered undefined"
+                            —
+                            <a
+                                href="https://doc.rust-lang.org/reference/behavior-considered-undefined.html"
+                                >https://doc.rust-lang.org/reference/behavior-considered-undefined.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                List includes "Data races" and "Accessing
+                                (loading from or storing to) a place that is
+                                dangling." "<code>unsafe</code> only means that
+                                avoiding undefined behavior is on the
+                                programmer." The list "is not exhaustive."
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="FN-ABI"></span
+                            ><strong
+                                ><a class="sid" href="#FN-ABI"
+                                    >[FN-ABI]</a
+                                ></strong
+                            >
+                            <code>fn</code> primitive, "ABI compatibility" —
+                            <a
+                                href="https://doc.rust-lang.org/core/primitive.fn.html"
+                                >https://doc.rust-lang.org/core/primitive.fn.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "The default ABI is 'Rust'." The page does not
+                                specify the Rust ABI's register use. —
+                                <strong
+                                    >Caveat in
+                                    <a
+                                        href="../lessons/02-how-a-cpu-runs-code.html"
+                                        >How a CPU runs code</a
+                                    >:</strong
+                                >
+                                the registers <code>compute</code> used are
+                                observed, not promised.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="NOMICON-SAFE"></span
+                            ><strong
+                                ><a class="sid" href="#NOMICON-SAFE"
+                                    >[NOMICON-SAFE]</a
+                                ></strong
+                            >
+                            The Rustonomicon, "How Safe and Unsafe Interact" —
+                            <a
+                                href="https://doc.rust-lang.org/nomicon/safe-unsafe-meaning.html"
+                                >https://doc.rust-lang.org/nomicon/safe-unsafe-meaning.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "No matter what, Safe Rust clients can't cause
+                                Undefined Behavior."
+                            </li>
+                            <li>
+                                "Safe Rust inherently has to trust that any
+                                Unsafe Rust it touches has been written
+                                correctly."
+                            </li>
+                            <li>
+                                <code>slice::get_unchecked</code> "performs
+                                unchecked indexing, allowing memory safety to be
+                                freely violated"; "All FFI … functions are
+                                <code>unsafe</code> to call."
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="NOMICON-SEND"></span
+                            ><strong
+                                ><a class="sid" href="#NOMICON-SEND"
+                                    >[NOMICON-SEND]</a
+                                ></strong
+                            >
+                            The Rustonomicon, "Send and Sync" —
+                            <a
+                                href="https://doc.rust-lang.org/nomicon/send-and-sync.html"
+                                >https://doc.rust-lang.org/nomicon/send-and-sync.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "A type is Send if it is safe to send it to
+                                another thread. A type is Sync if it is safe to
+                                share between threads (T is Sync if and only if
+                                <code>&amp;T</code> is Send)." Automatically
+                                derived.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="RUSTC-OVERVIEW"></span
+                            ><strong
+                                ><a class="sid" href="#RUSTC-OVERVIEW"
+                                    >[RUSTC-OVERVIEW]</a
+                                ></strong
+                            >
+                            Rust Compiler Development Guide, "Overview of the
+                            compiler" —
+                            <a
+                                href="https://rustc-dev-guide.rust-lang.org/overview.html"
+                                >https://rustc-dev-guide.rust-lang.org/overview.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                Stages: tokens → AST → HIR → THIR → MIR ("MIR is
+                                used for borrow checking") → LLVM IR → machine
+                                code in object files → "linked together to
+                                produce the final binary." —
+                                <em>Implementation detail of rustc</em>, can
+                                change between versions.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="R-VEC"></span
+                            ><strong
+                                ><a class="sid" href="#R-VEC"
+                                    >[R-VEC]</a
+                                ></strong
+                            >
+                            The Rust Programming Language, §8.1 "Storing Lists
+                            of Values with Vectors" —
+                            <a
+                                href="https://doc.rust-lang.org/book/ch08-01-vectors.html"
+                                >https://doc.rust-lang.org/book/ch08-01-vectors.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                Explains the
+                                <code>let first = &amp;v[0]; v.push(6);</code>
+                                error: adding an element "might require
+                                allocating new memory and copying the old
+                                elements to the new space". —
+                                <em>Explanation.</em> Used in
+                                <a
+                                    href="../lessons/10-string-and-vec-memory.html"
+                                    >String and Vec</a
+                                >.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="R-PANIC"></span
+                            ><strong
+                                ><a class="sid" href="#R-PANIC"
+                                    >[R-PANIC]</a
+                                ></strong
+                            >
+                            The Rust Programming Language, §9.1 "Unrecoverable
+                            Errors with panic!" —
+                            <a
+                                href="https://doc.rust-lang.org/book/ch09-01-unrecoverable-errors-with-panic.html"
+                                >https://doc.rust-lang.org/book/ch09-01-unrecoverable-errors-with-panic.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "By default, when a panic occurs, the program
+                                starts unwinding, which means Rust walks back up
+                                the stack and cleans up the data from each
+                                function it encounters." —
+                                <em>Explanation.</em> Exit status 101 is
+                                observed (<a class="sid" href="#RUN-INDEX"
+                                    >[RUN-INDEX]</a
+                                >). Used in
+                                <a
+                                    href="../lessons/14-memory-bugs-and-rust-safety.html"
+                                    >Memory bugs and safety</a
+                                >.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="STD-BOXNEW"></span
+                            ><strong
+                                ><a class="sid" href="#STD-BOXNEW"
+                                    >[STD-BOXNEW]</a
+                                ></strong
+                            >
+                            <code>Box::new</code> —
+                            <a
+                                href="https://doc.rust-lang.org/std/boxed/struct.Box.html#method.new"
+                                >https://doc.rust-lang.org/std/boxed/struct.Box.html#method.new</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "Allocates memory on the heap and then places
+                                <code>x</code> into it. This doesn't actually
+                                allocate if <code>T</code> is zero-sized." —
+                                <em>Library guarantee.</em> Used in
+                                <a
+                                    href="../lessons/09-rust-values-stack-heap-and-box.html"
+                                    >Values, stack, heap, Box</a
+                                >.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="STD-COPY"></span
+                            ><strong
+                                ><a class="sid" href="#STD-COPY"
+                                    >[STD-COPY]</a
+                                ></strong
+                            >
+                            <code>std::marker::Copy</code> —
+                            <a
+                                href="https://doc.rust-lang.org/std/marker/trait.Copy.html"
+                                >https://doc.rust-lang.org/std/marker/trait.Copy.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "the only difference is whether you are allowed
+                                to access x after the assignment. Under the
+                                hood, both a copy and a move can result in bits
+                                being copied in memory, although this is
+                                sometimes optimized away." —
+                                <em>Library documentation.</em> Used in
+                                <a
+                                    href="../lessons/11-ownership-moves-clone-and-drop.html"
+                                    >Ownership, moves, drop</a
+                                >.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="STD-FORGET"></span
+                            ><strong
+                                ><a class="sid" href="#STD-FORGET"
+                                    >[STD-FORGET]</a
+                                ></strong
+                            >
+                            <code>std::mem::forget</code> —
+                            <a
+                                href="https://doc.rust-lang.org/std/mem/fn.forget.html"
+                                >https://doc.rust-lang.org/std/mem/fn.forget.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "forget is not marked as unsafe, because Rust's
+                                safety guarantees do not include a guarantee
+                                that destructors will always run." —
+                                <em>Library documentation.</em> Used in
+                                <a
+                                    href="../lessons/14-memory-bugs-and-rust-safety.html"
+                                    >Memory bugs and safety</a
+                                >.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="REF-LOOP"></span
+                            ><strong
+                                ><a class="sid" href="#REF-LOOP"
+                                    >[REF-LOOP]</a
+                                ></strong
+                            >
+                            The Rust Reference, "Iterator loops" —
+                            <a
+                                href="https://doc.rust-lang.org/reference/expressions/loop-expr.html#iterator-loops"
+                                >https://doc.rust-lang.org/reference/expressions/loop-expr.html#iterator-loops</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "A for expression is a syntactic construct for
+                                looping over elements provided by an
+                                implementation of std::iter::IntoIterator." —
+                                <em>Language rule.</em> Used in
+                                <a
+                                    href="../lessons/13-iterators-and-following-data.html"
+                                    >Iterators</a
+                                >.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="REF-NOTUNSAFE"></span
+                            ><strong
+                                ><a class="sid" href="#REF-NOTUNSAFE"
+                                    >[REF-NOTUNSAFE]</a
+                                ></strong
+                            >
+                            The Rust Reference, "Behavior not considered unsafe"
+                            —
+                            <a
+                                href="https://doc.rust-lang.org/reference/behavior-not-considered-unsafe.html"
+                                >https://doc.rust-lang.org/reference/behavior-not-considered-unsafe.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                Lists deadlocks, leaks of memory and other
+                                resources, exiting without calling destructors,
+                                and integer overflow. —
+                                <em>Language rule.</em> Used in
+                                <a
+                                    href="../lessons/14-memory-bugs-and-rust-safety.html"
+                                    >Memory bugs and safety</a
+                                >.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="STD-SRC-STACKOVF"></span
+                            ><strong
+                                ><a class="sid" href="#STD-SRC-STACKOVF"
+                                    >[STD-SRC-STACKOVF]</a
+                                ></strong
+                            >
+                            Rust standard library source,
+                            <code
+                                >library/std/src/sys/pal/unix/stack_overflow.rs</code
+                            >
+                            at tag 1.98.1 —
+                            <a
+                                href="https://github.com/rust-lang/rust/blob/1.98.1/library/std/src/sys/pal/unix/stack_overflow.rs"
+                                >https://github.com/rust-lang/rust/blob/1.98.1/library/std/src/sys/pal/unix/stack_overflow.rs</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                Installs a <code>SIGSEGV</code>/<code
+                                    >SIGBUS</code
+                                >
+                                handler on an alternate stack; if the faulting
+                                address is in the guard page it prints "thread
+                                '…' has overflowed its stack" and aborts. —
+                                <em>Implementation, not a language promise.</em>
+                                Used in
+                                <a
+                                    href="../lessons/14-memory-bugs-and-rust-safety.html"
+                                    >Memory bugs and safety</a
+                                >; matches
+                                <a class="sid" href="#RUN-RECURSE"
+                                    >[RUN-RECURSE]</a
+                                >.
+                            </li>
+                        </ul>
+                        <h2 id="linux-and-operating-systems">
+                            Linux and operating systems
+                        </h2>
+                        <p class="entry">
+                            <span id="K-CONCEPTS"></span
+                            ><strong
+                                ><a class="sid" href="#K-CONCEPTS"
+                                    >[K-CONCEPTS]</a
+                                ></strong
+                            >
+                            Linux kernel docs, "Concepts overview" (memory
+                            management) —
+                            <a
+                                href="https://www.kernel.org/doc/html/latest/admin-guide/mm/concepts.html"
+                                >https://www.kernel.org/doc/html/latest/admin-guide/mm/concepts.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "With virtual memory, each and every memory
+                                access uses a virtual address."
+                            </li>
+                            <li>
+                                "The physical system memory is divided into page
+                                frames, or pages. The size of each page is
+                                architecture specific."
+                            </li>
+                            <li>
+                                "The page tables are organized hierarchically."
+                                "The lowest bits in the virtual address define
+                                the offset inside the actual page."
+                            </li>
+                            <li>
+                                "CPUs maintain a cache of such translations
+                                called Translation Lookaside Buffer (or TLB)."
+                            </li>
+                            <li>
+                                Demand paging; for anonymous mappings "When the
+                                program performs a write, a regular physical
+                                page will be allocated."
+                            </li>
+                            <li>Swap: "the dirty page will be swapped out."</li>
+                        </ul>
+                        <p class="entry">
+                            <span id="K-X86-MM"></span
+                            ><strong
+                                ><a class="sid" href="#K-X86-MM"
+                                    >[K-X86-MM]</a
+                                ></strong
+                            >
+                            Linux kernel docs, "Memory Management" (x86_64) —
+                            <a
+                                href="https://www.kernel.org/doc/html/latest/arch/x86/x86_64/mm.html"
+                                >https://www.kernel.org/doc/html/latest/arch/x86/x86_64/mm.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                4-level paging:
+                                <code
+                                    >0000000000000000 … 00007fffffffefff | ~128
+                                    TB | user-space virtual memory, different
+                                    per mm</code
+                                >. —
+                                <em
+                                    >Documented OS behaviour, x86-64 Linux
+                                    only.</em
+                                >
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="PROC-MAPS"></span
+                            ><strong
+                                ><a class="sid" href="#PROC-MAPS"
+                                    >[PROC-MAPS]</a
+                                ></strong
+                            >
+                            <code>proc_pid_maps(5)</code> —
+                            <a
+                                href="https://man7.org/linux/man-pages/man5/proc_pid_maps.5.html"
+                                >https://man7.org/linux/man-pages/man5/proc_pid_maps.5.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                Field meanings; permissions
+                                <code>r w x s p</code>; <code>[stack]</code> is
+                                "The initial process's (also known as the main
+                                thread's) stack"; <code>[heap]</code> is "The
+                                process's heap"; "If the pathname field is
+                                blank, this is an anonymous mapping as obtained
+                                via mmap(2)."
+                            </li>
+                            <li>
+                                <code>[stack:tid]</code> labels for thread
+                                stacks existed only Linux 3.4–4.4. —
+                                <strong
+                                    >Caveat in
+                                    <a href="../lessons/04-virtual-memory.html"
+                                        >Inside an address space</a
+                                    >
+                                    and
+                                    <a
+                                        href="../lessons/06-threads-and-their-stacks.html"
+                                        >Threads and their stacks</a
+                                    >:</strong
+                                >
+                                on current kernels thread stacks appear as
+                                unnamed anonymous mappings.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="MMAP2"></span
+                            ><strong
+                                ><a class="sid" href="#MMAP2"
+                                    >[MMAP2]</a
+                                ></strong
+                            >
+                            <code>mmap(2)</code> —
+                            <a
+                                href="https://man7.org/linux/man-pages/man2/mmap.2.html"
+                                >https://man7.org/linux/man-pages/man2/mmap.2.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "mmap() creates a new mapping in the virtual
+                                address space of the calling process."
+                                <code>MAP_ANONYMOUS</code>: "The mapping is not
+                                backed by any file; its contents are initialized
+                                to zero." After <code>munmap</code>, "subsequent
+                                references to these pages will generate
+                                SIGSEGV."
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="MALLOPT3"></span
+                            ><strong
+                                ><a class="sid" href="#MALLOPT3"
+                                    >[MALLOPT3]</a
+                                ></strong
+                            >
+                            <code>mallopt(3)</code> —
+                            <a
+                                href="https://man7.org/linux/man-pages/man3/mallopt.3.html"
+                                >https://man7.org/linux/man-pages/man3/mallopt.3.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                <code>M_TRIM_THRESHOLD</code>: "When the amount
+                                of contiguous free memory at the top of the heap
+                                grows sufficiently large, free(3) employs
+                                sbrk(2) to release this memory back to the
+                                system." — <em>glibc behaviour.</em> Used in
+                                <a
+                                    href="../lessons/11-ownership-moves-clone-and-drop.html"
+                                    >Ownership, moves, drop</a
+                                >: freeing usually returns a block to the
+                                allocator, not to the kernel.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="MALLOC3"></span
+                            ><strong
+                                ><a class="sid" href="#MALLOC3"
+                                    >[MALLOC3]</a
+                                ></strong
+                            >
+                            <code>malloc(3)</code> (glibc notes) —
+                            <a
+                                href="https://man7.org/linux/man-pages/man3/malloc.3.html"
+                                >https://man7.org/linux/man-pages/man3/malloc.3.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "Normally, malloc() allocates memory from the
+                                heap, and adjusts the size of the heap as
+                                required, using sbrk(2). When allocating blocks
+                                of memory larger than MMAP_THRESHOLD bytes, the
+                                glibc malloc() implementation allocates the
+                                memory as a private anonymous mapping using
+                                mmap(2). MMAP_THRESHOLD is 128 kB by default."
+                            </li>
+                            <li>
+                                <strong>Caveat:</strong> the man page does not
+                                say whether <code>free</code> returns memory to
+                                the kernel. The documentation says only that
+                                freeing returns the block to the allocator, and
+                                the allocator <em>may</em> keep it — supported
+                                by
+                                <a class="sid" href="#STD-VEC">[STD-VEC]</a>
+                                ("its buffer may simply be reused by another
+                                allocation").
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="EXECVE2"></span
+                            ><strong
+                                ><a class="sid" href="#EXECVE2"
+                                    >[EXECVE2]</a
+                                ></strong
+                            >
+                            <code>execve(2)</code> —
+                            <a
+                                href="https://man7.org/linux/man-pages/man2/execve.2.html"
+                                >https://man7.org/linux/man-pages/man2/execve.2.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "causes the program that is currently being run
+                                by the calling process to be replaced with a new
+                                program, with newly initialized stack, heap, and
+                                (initialized and uninitialized) data segments."
+                                PID is kept. For dynamically linked ELF, "the
+                                interpreter named in the PT_INTERP segment is
+                                used to load the needed shared objects."
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="FORK2"></span
+                            ><strong
+                                ><a class="sid" href="#FORK2"
+                                    >[FORK2]</a
+                                ></strong
+                            >
+                            <code>fork(2)</code> —
+                            <a
+                                href="https://man7.org/linux/man-pages/man2/fork.2.html"
+                                >https://man7.org/linux/man-pages/man2/fork.2.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "The child process and the parent process run in
+                                separate memory spaces. At the time of fork()
+                                both memory spaces have the same content."
+                                "Under Linux, fork() is implemented using
+                                copy-on-write pages."
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="ELF5"></span
+                            ><strong
+                                ><a class="sid" href="#ELF5">[ELF5]</a></strong
+                            >
+                            <code>elf(5)</code> —
+                            <a
+                                href="https://man7.org/linux/man-pages/man5/elf.5.html"
+                                >https://man7.org/linux/man-pages/man5/elf.5.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                <code>e_entry</code>: "the virtual address to
+                                which the system first transfers control, thus
+                                starting the process."
+                            </li>
+                            <li>
+                                <code>.text</code> "holds the 'text', or
+                                executable instructions";
+                                <code>.rodata</code> read-only data;
+                                <code>.data</code> initialised data;
+                                <code>.bss</code> uninitialised data;
+                                <code>PT_LOAD</code> loadable segment;
+                                <code>PT_INTERP</code> interpreter path.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="PTHREADS7"></span
+                            ><strong
+                                ><a class="sid" href="#PTHREADS7"
+                                    >[PTHREADS7]</a
+                                ></strong
+                            >
+                            <code>pthreads(7)</code> —
+                            <a
+                                href="https://man7.org/linux/man-pages/man7/pthreads.7.html"
+                                >https://man7.org/linux/man-pages/man7/pthreads.7.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                Threads "share the same global memory (data and
+                                heap segments), but each thread has its own
+                                stack (automatic variables)."
+                            </li>
+                            <li>
+                                Process-wide: PID, open file descriptors, signal
+                                dispositions, current directory, resource
+                                limits, …
+                            </li>
+                            <li>
+                                Per thread: thread ID, signal mask,
+                                <code>errno</code>, alternate signal stack,
+                                scheduling policy and priority.
+                            </li>
+                            <li>
+                                Default thread stack size comes from
+                                <code>RLIMIT_STACK</code> for pthreads. —
+                                <strong>Caveat:</strong> Rust's
+                                <code>std::thread</code> sets its own default
+                                (<a class="sid" href="#STD-THREAD"
+                                    >[STD-THREAD]</a
+                                >).
+                            </li>
+                        </ul>
+                        <h2 id="cpu-and-memory-hardware">
+                            CPU and memory hardware
+                        </h2>
+                        <p class="entry">
+                            <span id="ARM-MM"></span
+                            ><strong
+                                ><a class="sid" href="#ARM-MM"
+                                    >[ARM-MM]</a
+                                ></strong
+                            >
+                            Arm, "Learn the architecture — Memory Management"
+                            (101811, v1.0) —
+                            <a
+                                href="https://developer.arm.com/-/media/Arm%20Developer%20Community/PDF/Learn%20the%20Architecture/LearnTheArchitecture-MemoryManagement-101811_0100_00_en.pdf"
+                                >https://developer.arm.com/-/media/Arm%20Developer%20Community/PDF/Learn%20the%20Architecture/LearnTheArchitecture-MemoryManagement-101811_0100_00_en.pdf</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                "each application can use its own set of virtual
+                                addresses that will be mapped to different
+                                locations in the physical system. As the
+                                operating system switches between different
+                                applications it re-programs the map."
+                            </li>
+                            <li>
+                                "The Memory Management Unit (MMU) performs
+                                translations." It contains "The table walk unit
+                                … [and] Translation Lookaside Buffers (TLBs),
+                                which cache recently used translations."
+                            </li>
+                            <li>
+                                "an OS can present multiple fragmented physical
+                                regions of memory as a single, contiguous
+                                virtual address space."
+                            </li>
+                            <li>
+                                Armv8-A granules: "4KB, 16KB, and 64KB." TLB
+                                entries can be tagged with an ASID so several
+                                applications' translations coexist. —
+                                <em>Architecture (Arm).</em>
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="INTEL-SDM"></span
+                            ><strong
+                                ><a class="sid" href="#INTEL-SDM"
+                                    >[INTEL-SDM]</a
+                                ></strong
+                            >
+                            Intel 64 and IA-32 Architectures Software
+                            Developer's Manuals —
+                            <a
+                                href="https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html"
+                                >https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                Volume 1 (Basic Architecture) defines the x86-64
+                                execution environment: general-purpose
+                                registers, <code>RIP</code>,
+                                <code>RFLAGS</code>. Volume 3A covers paging and
+                                TLBs. — <em>Architecture (x86-64).</em> Used
+                                only for register names; behaviour shown in the
+                                explanations comes from
+                                <a class="sid" href="#RUN-ASM">[RUN-ASM]</a>.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="PSABI"></span
+                            ><strong
+                                ><a class="sid" href="#PSABI"
+                                    >[PSABI]</a
+                                ></strong
+                            >
+                            System V AMD64 psABI (living document) —
+                            <a href="https://gitlab.com/x86-psABIs/x86-64-ABI"
+                                >https://gitlab.com/x86-psABIs/x86-64-ABI</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                Integer arguments in <code>rdi</code>,
+                                <code>rsi</code>, <code>rdx</code>,
+                                <code>rcx</code>, <code>r8</code>,
+                                <code>r9</code>; result in <code>rax</code>.
+                                Applies to C-ABI functions. —
+                                <strong>Caveat:</strong> see
+                                <a class="sid" href="#FN-ABI">[FN-ABI]</a>.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="DREPPER"></span
+                            ><strong
+                                ><a class="sid" href="#DREPPER"
+                                    >[DREPPER]</a
+                                ></strong
+                            >
+                            Ulrich Drepper, "What Every Programmer Should Know
+                            About Memory" (2007) —
+                            <a
+                                href="https://www.akkadia.org/drepper/cpumemory.pdf"
+                                >https://www.akkadia.org/drepper/cpumemory.pdf</a
+                            >
+                        </p>
+                        <ul>
+                            <li>
+                                §3: L1d/L1i/L2/L3 hierarchy; memory is cached in
+                                whole <em>cache lines</em> (64 bytes in the
+                                examples); caches are managed by the processor
+                                and are largely transparent to programs.
+                            </li>
+                            <li>
+                                <strong>Caveat:</strong> 2007 hardware.
+                                <a
+                                    href="../lessons/07-registers-caches-and-a-memory-read.html"
+                                    >Caches and one load</a
+                                >
+                                uses it for structure only, not for timings.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="OSTEP-PROC"></span
+                            ><span id="OSTEP-CPU"></span
+                            ><span id="OSTEP-PAGING"></span
+                            ><span id="OSTEP-TLB"></span
+                            ><span id="OSTEP-SWAP"></span
+                            ><span id="OSTEP-THREADS"></span
+                            ><strong
+                                ><a class="sid" href="#OSTEP-PROC"
+                                    >[OSTEP-PROC]</a
+                                >
+                                <a class="sid" href="#OSTEP-CPU">[OSTEP-CPU]</a>
+                                <a class="sid" href="#OSTEP-PAGING"
+                                    >[OSTEP-PAGING]</a
+                                >
+                                <a class="sid" href="#OSTEP-TLB">[OSTEP-TLB]</a>
+                                <a class="sid" href="#OSTEP-SWAP"
+                                    >[OSTEP-SWAP]</a
+                                >
+                                <a class="sid" href="#OSTEP-THREADS"
+                                    >[OSTEP-THREADS]</a
+                                ></strong
+                            >
+                            Arpaci-Dusseau,
+                            <em>Operating Systems: Three Easy Pieces</em> —
+                            <a
+                                href="https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-intro.pdf"
+                                >https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-intro.pdf</a
+                            >, …/cpu-mechanisms.pdf, …/vm-paging.pdf,
+                            …/vm-tlbs.pdf, …/vm-beyondphys.pdf,
+                            …/threads-intro.pdf
+                        </p>
+                        <ul>
+                            <li>
+                                Process creation: "modern OSes perform the
+                                process lazily, i.e., by loading pieces of code
+                                or data only as they are needed."
+                            </li>
+                            <li>
+                                Paging: split into VPN and offset; "the offset
+                                stays the same (i.e., it is not translated)";
+                                <code
+                                    >PhysAddr = (PFN &lt;&lt; SHIFT) |
+                                    offset</code
+                                >.
+                            </li>
+                            <li>
+                                TLB hit/miss flow; present bit; a page fault on
+                                a legal-but-absent page "should be called a page
+                                miss."
+                            </li>
+                            <li>
+                                Threads: "each thread has its own private set of
+                                registers"; threads "share the same address
+                                space"; a thread switch does not change page
+                                tables.
+                            </li>
+                            <li>
+                                <em>Reputable textbook; teaching models.</em>
+                            </li>
+                        </ul>
+                        <h2 id="observed-on-the-machine-above">
+                            Observed on the machine above
+                        </h2>
+                        <p class="entry">
+                            <span id="RUN-ELF"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-ELF"
+                                    >[RUN-ELF]</a
+                                ></strong
+                            >
+                            <code>readelf -h</code>, <code>readelf -l</code>,
+                            <code>nm</code> on a release build of
+                            <code>examples/x.rs</code>.
+                        </p>
+                        <ul>
+                            <li>
+                                ELF type
+                                <code
+                                    >DYN (Position-Independent Executable
+                                    file)</code
+                                >; <code>Entry point address: 0x14e90</code>;
+                                symbol at that address is <code>_start</code>,
+                                not <code>main</code>.
+                            </li>
+                            <li>
+                                Symbols present: <code>_start</code>,
+                                <code>main</code> (C-level, generated),
+                                <code>std::rt::lang_start_internal</code>, the
+                                user's <code>x::main</code>.
+                            </li>
+                            <li>
+                                <code
+                                    >[Requesting program interpreter:
+                                    /lib64/ld-linux-x86-64.so.2]</code
+                                >.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="RUN-ASM"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-ASM"
+                                    >[RUN-ASM]</a
+                                ></strong
+                            >
+                            <code>rustc --emit asm</code> of
+                            <code>examples/x.rs</code>.
+                        </p>
+                        <ul>
+                            <li>
+                                <code>-O</code>: <code>compute</code> is
+                                <code>lea eax, [rdi + rsi]</code> /
+                                <code>ret</code> — <code>x</code> never touches
+                                memory.
+                            </li>
+                            <li>
+                                <code>-C opt-level=0</code>:
+                                <code>add edi, esi</code> /
+                                <code>mov dword ptr [rsp + 4], edi</code> /
+                                <code>seto al</code> / <code>jo …</code> /
+                                <code>mov eax, dword ptr [rsp + 4]</code> —
+                                <code>x</code> gets a stack slot and there is an
+                                overflow check.
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="RUN-MAPS"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-MAPS"
+                                    >[RUN-MAPS]</a
+                                ></strong
+                            >
+                            <code>examples/maps.rs</code>, run twice. Real
+                            <code>/proc/self/maps</code> plus printed pointers.
+                        </p>
+                        <ul>
+                            <li>
+                                The 3-element <code>Vec</code>'s buffer is
+                                inside <code>[heap]</code>; the 1 MiB
+                                <code>Vec</code>'s buffer is in its own
+                                anonymous mapping; the spawned thread's local is
+                                in an anonymous mapping of about 2 MiB;
+                                <code>main</code>'s local is in
+                                <code>[stack]</code>.
+                            </li>
+                            <li>
+                                Both runs used different addresses
+                                (address-space layout randomisation).
+                            </li>
+                        </ul>
+                        <p class="entry">
+                            <span id="RUN-RSS"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-RSS"
+                                    >[RUN-RSS]</a
+                                ></strong
+                            >
+                            <code>examples/rss.rs</code>. A 64 MiB
+                            <code>vec![0u8; …]</code>:
+                            <code>Size: 65540 kB</code>,
+                            <code>Rss: 4 kB</code> before writing;
+                            <code>Rss: 65536 kB</code> after writing one byte
+                            per page.
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-VEC"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-VEC"
+                                    >[RUN-VEC]</a
+                                ></strong
+                            >
+                            <code>examples/vec.rs</code>.
+                            <code>vec![10, 20]</code> →
+                            <code>len=2 cap=2</code>; after
+                            <code>push(30)</code> → <code>len=3 cap=4</code>,
+                            buffer address unchanged (glibc grew the block in
+                            place). A second vector with another allocation
+                            placed right after its buffer: unchanged at
+                            <code>cap=4</code>, moved (<code>…d70</code> →
+                            <code>…db0</code>) when capacity went to 8.
+                            <code>Vec::new()</code> → <code>cap=0</code>;
+                            <code>"né"</code> → <code>len=3</code>, 2 chars,
+                            bytes <code>[110, 195, 169]</code>.
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-MOVES"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-MOVES"
+                                    >[RUN-MOVES]</a
+                                ></strong
+                            >
+                            <code>examples/moves.rs</code>. After
+                            <code>let b = a;</code>,
+                            <code>b.as_ptr()</code> equals the address
+                            <code>a</code>'s buffer had;
+                            <code>b.clone()</code> has a different buffer. Drop
+                            messages: <code>end of main</code>, then
+                            <code>drop second</code>, <code>drop third</code>,
+                            <code>drop first</code> (the moved-from binding
+                            <code>second</code> was not dropped separately).
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-REFS"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-REFS"
+                                    >[RUN-REFS]</a
+                                ></strong
+                            >
+                            <code>examples/refs.rs</code>.
+                            <code>&amp;scores</code> holds a stack address (the
+                            handle); <code>&amp;scores[0]</code> holds a heap
+                            address (the buffer).
+                            <code
+                                >size_of::&lt;&amp;Vec&lt;i32&gt;&gt;() =
+                                8</code
+                            >, <code>&amp;[i32]</code> and
+                            <code>&amp;str</code> = 16.
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-SUM-ASM"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-SUM-ASM"
+                                    >[RUN-SUM-ASM]</a
+                                ></strong
+                            >
+                            <code>examples/OUTPUT.txt</code>, optimised assembly
+                            of <code>main</code> in <code>sum.rs</code>:
+                            <code>__rust_alloc(8, 4)</code>; one 8-byte store of
+                            <code>85899345930</code> (20·2³² + 10); handle
+                            stored as cap at <code>[rsp+8]</code>, ptr at
+                            <code>[rsp+16]</code>, len at <code>[rsp+24]</code>;
+                            <code>RawVec::grow_one</code>;
+                            <code>mov dword ptr [rbx + 8], 30</code>; two loads
+                            plus <code>add eax, 30</code>;
+                            <code>__rust_dealloc</code>. No
+                            <code>total</code> symbol.
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-BOXES"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-BOXES"
+                                    >[RUN-BOXES]</a
+                                ></strong
+                            >
+                            <code>examples/boxes.rs</code>.
+                            <code>size_of::&lt;Box&lt;i32&gt;&gt;() = 8</code>,
+                            <code>size_of::&lt;Pair&gt;() = 16</code>;
+                            <code>x</code>, <code>b</code> and
+                            <code>p</code> reported inside <code>[stack]</code>,
+                            the boxed <code>7</code> and <code>90</code> inside
+                            <code>[heap]</code>, 0x20 bytes apart.
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-CALLS"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-CALLS"
+                                    >[RUN-CALLS]</a
+                                ></strong
+                            >
+                            <code>examples/calls.rs</code>. Unoptimised:
+                            <code>add</code> and <code>average</code> each begin
+                            with <code>push rax</code> and end with
+                            <code>pop rcx; ret</code>;
+                            <code>main</code> reserves 40 bytes with
+                            <code>sub rsp, 40</code>. Optimised
+                            (<code>-O</code>): no symbol for
+                            <code>average</code> or <code>add</code>; the
+                            arithmetic is inside <code>main</code>.
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-SIZES"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-SIZES"
+                                    >[RUN-SIZES]</a
+                                ></strong
+                            >
+                            same program:
+                            <code>size_of::&lt;Vec&lt;i32&gt;&gt;() = 24</code>,
+                            <code>String = 24</code>,
+                            <code>Box&lt;i32&gt; = 8</code>.
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-MOVE"></span
+                            ><span id="RUN-DANGLE"></span
+                            ><span id="RUN-OUTLIVES"></span
+                            ><span id="RUN-BORROWMUT"></span
+                            ><span id="RUN-AFTERINTO"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-MOVE">[RUN-MOVE]</a>
+                                <a class="sid" href="#RUN-DANGLE"
+                                    >[RUN-DANGLE]</a
+                                >
+                                <a class="sid" href="#RUN-OUTLIVES"
+                                    >[RUN-OUTLIVES]</a
+                                >
+                                <a class="sid" href="#RUN-BORROWMUT"
+                                    >[RUN-BORROWMUT]</a
+                                >
+                                <a class="sid" href="#RUN-AFTERINTO"
+                                    >[RUN-AFTERINTO]</a
+                                ></strong
+                            >
+                            Compiler errors E0382, E0106, E0597, E0502, E0382,
+                            copied from <code>examples/OUTPUT.txt</code>.
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-INDEX"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-INDEX"
+                                    >[RUN-INDEX]</a
+                                ></strong
+                            >
+                            <code>examples/index.rs</code>: <code>None</code>,
+                            then
+                            <code
+                                >index out of bounds: the len is 3 but the index
+                                is 10</code
+                            >, exit status 101.
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-RECURSE"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-RECURSE"
+                                    >[RUN-RECURSE]</a
+                                ></strong
+                            >
+                            <code>examples/recurse.rs</code>:
+                            <code
+                                >thread 'main' (…) has overflowed its
+                                stack</code
+                            >
+                            /
+                            <code
+                                >fatal runtime error: stack overflow,
+                                aborting</code
+                            >, exit status 134 (SIGABRT). An earlier version
+                            (<code>count_down(n + 1) + 1</code>) built with
+                            <code>-O</code> did not overflow at all: the
+                            optimiser removed the recursion and the program
+                            looped forever.
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-ITER"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-ITER"
+                                    >[RUN-ITER]</a
+                                ></strong
+                            >
+                            <code>examples/iterm.rs</code>:
+                            <code>11 21 31</code> after <code>iter_mut</code>,
+                            then <code>owned 11/21/31</code> from
+                            <code>into_iter</code>; <code>size_of</code>
+                            <code>slice::Iter&lt;i32&gt;</code> = 16,
+                            <code>IterMut</code> = 16,
+                            <code>vec::IntoIter&lt;i32&gt;</code> = 32.
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-SCOPE"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-SCOPE"
+                                    >[RUN-SCOPE]</a
+                                ></strong
+                            >
+                            <code>examples/threads_scope.rs</code>: output as
+                            recorded.
+                        </p>
+                        <p class="entry">
+                            <span id="RUN-LSCPU"></span
+                            ><strong
+                                ><a class="sid" href="#RUN-LSCPU"
+                                    >[RUN-LSCPU]</a
+                                ></strong
+                            >
+                            <code>lscpu</code>:
+                            <code>L1d cache: 320 KiB (8 instances)</code>,
+                            <code>L1i cache: 384 KiB (8 instances)</code>,
+                            <code>L2 cache: 7 MiB (5 instances)</code>,
+                            <code>L3 cache: 12 MiB (1 instance)</code>;
+                            <code>getconf LEVEL1_DCACHE_LINESIZE</code> = 64.
+                        </p>
+                        <h2 id="secondary-reading-not-used-as-proof">
+                            Secondary reading (not used as proof)
+                        </h2>
+                        <p>
+                            Wikipedia links appear beside first uses of general
+                            OS and hardware terms. All were checked to return
+                            HTTP 200 on 2026-10-14. "Heap" links go to
+                            <em>Memory management</em> (allocation sense), never
+                            to <em>Heap (data structure)</em>.
+                        </p>
+                        <ul>
+                            <li>
+                                Arithmetic logic unit —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Arithmetic_logic_unit"
+                                    >https://en.wikipedia.org/wiki/Arithmetic_logic_unit</a
+                                >
+                                (<a
+                                    href="../lessons/02-how-a-cpu-runs-code.html"
+                                    >How a CPU runs code</a
+                                >)
+                            </li>
+                            <li>
+                                Buffer overflow —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Buffer_overflow"
+                                    >https://en.wikipedia.org/wiki/Buffer_overflow</a
+                                >
+                                (<a
+                                    href="../lessons/14-memory-bugs-and-rust-safety.html"
+                                    >Memory bugs and safety</a
+                                >)
+                            </li>
+                            <li>
+                                C dynamic memory allocation#Common errors —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/C_dynamic_memory_allocation#Common_errors"
+                                    >https://en.wikipedia.org/wiki/C_dynamic_memory_allocation#Common_errors</a
+                                >
+                                (<a
+                                    href="../lessons/11-ownership-moves-clone-and-drop.html"
+                                    >Ownership, moves, drop</a
+                                >)
+                            </li>
+                            <li>
+                                <strong>[W-CALLSTACK]</strong> Call stack —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Call_stack"
+                                    >https://en.wikipedia.org/wiki/Call_stack</a
+                                >
+                                (<a
+                                    href="../lessons/08-function-calls-and-stack-frames.html"
+                                    >Calls and stack frames</a
+                                >)
+                            </li>
+                            <li>
+                                Calling convention —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Calling_convention"
+                                    >https://en.wikipedia.org/wiki/Calling_convention</a
+                                >
+                                (<a
+                                    href="../lessons/08-function-calls-and-stack-frames.html"
+                                    >Calls and stack frames</a
+                                >)
+                            </li>
+                            <li>
+                                Central processing unit —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Central_processing_unit"
+                                    >https://en.wikipedia.org/wiki/Central_processing_unit</a
+                                >
+                                (<a
+                                    href="../lessons/02-how-a-cpu-runs-code.html"
+                                    >How a CPU runs code</a
+                                >)
+                            </li>
+                            <li>
+                                Compiler —
+                                <a href="https://en.wikipedia.org/wiki/Compiler"
+                                    >https://en.wikipedia.org/wiki/Compiler</a
+                                >
+                                (<a href="../lessons/01-what-is-a-program.html"
+                                    >What a program is</a
+                                >)
+                            </li>
+                            <li>
+                                Computer program —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Computer_program"
+                                    >https://en.wikipedia.org/wiki/Computer_program</a
+                                >
+                                (<a href="../lessons/01-what-is-a-program.html"
+                                    >What a program is</a
+                                >)
+                            </li>
+                            <li>
+                                Context switch —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Context_switch"
+                                    >https://en.wikipedia.org/wiki/Context_switch</a
+                                >
+                                (<a
+                                    href="../lessons/03-programs-processes-and-the-kernel.html"
+                                    >Processes and the kernel</a
+                                >)
+                            </li>
+                            <li>
+                                CPU cache —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/CPU_cache"
+                                    >https://en.wikipedia.org/wiki/CPU_cache</a
+                                >
+                                (<a
+                                    href="../lessons/07-registers-caches-and-a-memory-read.html"
+                                    >Caches and one load</a
+                                >)
+                            </li>
+                            <li>
+                                Dangling pointer —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Dangling_pointer"
+                                    >https://en.wikipedia.org/wiki/Dangling_pointer</a
+                                >
+                                (<a
+                                    href="../lessons/10-string-and-vec-memory.html"
+                                    >String and Vec</a
+                                >
+                                and
+                                <a
+                                    href="../lessons/14-memory-bugs-and-rust-safety.html"
+                                    >Memory bugs and safety</a
+                                >)
+                            </li>
+                            <li>
+                                Data race —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Data_race"
+                                    >https://en.wikipedia.org/wiki/Data_race</a
+                                >
+                                (<a
+                                    href="../lessons/06-threads-and-their-stacks.html"
+                                    >Threads and their stacks</a
+                                >)
+                            </li>
+                            <li>
+                                Demand paging —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Demand_paging"
+                                    >https://en.wikipedia.org/wiki/Demand_paging</a
+                                >
+                                (<a href="../lessons/04-virtual-memory.html"
+                                    >Inside an address space</a
+                                >)
+                            </li>
+                            <li>
+                                Executable —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Executable"
+                                    >https://en.wikipedia.org/wiki/Executable</a
+                                >
+                                (<a href="../lessons/01-what-is-a-program.html"
+                                    >What a program is</a
+                                >)
+                            </li>
+                            <li>
+                                Heap (data structure), linked only to say it is
+                                a different meaning of "heap" —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Heap_(data_structure)"
+                                    >https://en.wikipedia.org/wiki/Heap_(data_structure)</a
+                                >
+                                (<a
+                                    href="../lessons/09-rust-values-stack-heap-and-box.html"
+                                    >Values, stack, heap, Box</a
+                                >)
+                            </li>
+                            <li>
+                                Inline expansion —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Inline_expansion"
+                                    >https://en.wikipedia.org/wiki/Inline_expansion</a
+                                >
+                                (<a
+                                    href="../lessons/08-function-calls-and-stack-frames.html"
+                                    >Calls and stack frames</a
+                                >)
+                            </li>
+                            <li>
+                                Instruction cycle —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Instruction_cycle"
+                                    >https://en.wikipedia.org/wiki/Instruction_cycle</a
+                                >
+                                (<a
+                                    href="../lessons/02-how-a-cpu-runs-code.html"
+                                    >How a CPU runs code</a
+                                >)
+                            </li>
+                            <li>
+                                Iterator —
+                                <a href="https://en.wikipedia.org/wiki/Iterator"
+                                    >https://en.wikipedia.org/wiki/Iterator</a
+                                >
+                                (<a
+                                    href="../lessons/13-iterators-and-following-data.html"
+                                    >Iterators</a
+                                >)
+                            </li>
+                            <li>
+                                Kernel (operating system) —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Kernel_(operating_system)"
+                                    >https://en.wikipedia.org/wiki/Kernel_(operating_system)</a
+                                >
+                                (<a href="../lessons/01-what-is-a-program.html"
+                                    >What a program is</a
+                                >)
+                            </li>
+                            <li>
+                                Locality of reference —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Locality_of_reference"
+                                    >https://en.wikipedia.org/wiki/Locality_of_reference</a
+                                >
+                                (<a
+                                    href="../lessons/07-registers-caches-and-a-memory-read.html"
+                                    >Caches and one load</a
+                                >)
+                            </li>
+                            <li>
+                                Machine code —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Machine_code"
+                                    >https://en.wikipedia.org/wiki/Machine_code</a
+                                >
+                                (<a href="../lessons/01-what-is-a-program.html"
+                                    >What a program is</a
+                                >)
+                            </li>
+                            <li>
+                                Memory hierarchy —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Memory_hierarchy"
+                                    >https://en.wikipedia.org/wiki/Memory_hierarchy</a
+                                >
+                                (<a
+                                    href="../lessons/07-registers-caches-and-a-memory-read.html"
+                                    >Caches and one load</a
+                                >)
+                            </li>
+                            <li>
+                                Memory management unit —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Memory_management_unit"
+                                    >https://en.wikipedia.org/wiki/Memory_management_unit</a
+                                >
+                                (<a
+                                    href="../lessons/05-physical-ram-and-address-translation.html"
+                                    >From virtual address to RAM</a
+                                >)
+                            </li>
+                            <li>
+                                Memory management#Manual memory management —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Memory_management#Manual_memory_management"
+                                    >https://en.wikipedia.org/wiki/Memory_management#Manual_memory_management</a
+                                >
+                                (<a
+                                    href="../lessons/09-rust-values-stack-heap-and-box.html"
+                                    >Values, stack, heap, Box</a
+                                >)
+                            </li>
+                            <li>
+                                Memory-mapped file —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Memory-mapped_file"
+                                    >https://en.wikipedia.org/wiki/Memory-mapped_file</a
+                                >
+                                (<a href="../lessons/04-virtual-memory.html"
+                                    >Inside an address space</a
+                                >)
+                            </li>
+                            <li>
+                                Operating system —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Operating_system"
+                                    >https://en.wikipedia.org/wiki/Operating_system</a
+                                >
+                                (<a
+                                    href="../lessons/03-programs-processes-and-the-kernel.html"
+                                    >Processes and the kernel</a
+                                >)
+                            </li>
+                            <li>
+                                <strong>[W-OOO]</strong> Out-of-order execution
+                                —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Out-of-order_execution"
+                                    >https://en.wikipedia.org/wiki/Out-of-order_execution</a
+                                >
+                                (<a
+                                    href="../lessons/02-how-a-cpu-runs-code.html"
+                                    >How a CPU runs code</a
+                                >)
+                            </li>
+                            <li>
+                                Page fault —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Page_fault"
+                                    >https://en.wikipedia.org/wiki/Page_fault</a
+                                >
+                                (<a
+                                    href="../lessons/05-physical-ram-and-address-translation.html"
+                                    >From virtual address to RAM</a
+                                >)
+                            </li>
+                            <li>
+                                Page table —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Page_table"
+                                    >https://en.wikipedia.org/wiki/Page_table</a
+                                >
+                                (<a
+                                    href="../lessons/05-physical-ram-and-address-translation.html"
+                                    >From virtual address to RAM</a
+                                >)
+                            </li>
+                            <li>
+                                Paging —
+                                <a href="https://en.wikipedia.org/wiki/Paging"
+                                    >https://en.wikipedia.org/wiki/Paging</a
+                                >
+                                (<a
+                                    href="../lessons/05-physical-ram-and-address-translation.html"
+                                    >From virtual address to RAM</a
+                                >)
+                            </li>
+                            <li>
+                                Pointer (computer programming) —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Pointer_(computer_programming)"
+                                    >https://en.wikipedia.org/wiki/Pointer_(computer_programming)</a
+                                >
+                                (<a
+                                    href="../lessons/12-references-borrowing-and-lifetimes.html"
+                                    >References and lifetimes</a
+                                >)
+                            </li>
+                            <li>
+                                Process (computing) —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Process_(computing)"
+                                    >https://en.wikipedia.org/wiki/Process_(computing)</a
+                                >
+                                (<a href="../lessons/01-what-is-a-program.html"
+                                    >What a program is</a
+                                >
+                                and
+                                <a
+                                    href="../lessons/03-programs-processes-and-the-kernel.html"
+                                    >Processes and the kernel</a
+                                >)
+                            </li>
+                            <li>
+                                Processor register —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Processor_register"
+                                    >https://en.wikipedia.org/wiki/Processor_register</a
+                                >
+                                (<a
+                                    href="../lessons/02-how-a-cpu-runs-code.html"
+                                    >How a CPU runs code</a
+                                >)
+                            </li>
+                            <li>
+                                Race condition#Data race —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Race_condition#Data_race"
+                                    >https://en.wikipedia.org/wiki/Race_condition#Data_race</a
+                                >
+                                (<a
+                                    href="../lessons/12-references-borrowing-and-lifetimes.html"
+                                    >References and lifetimes</a
+                                >)
+                            </li>
+                            <li>
+                                Random-access memory —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Random-access_memory"
+                                    >https://en.wikipedia.org/wiki/Random-access_memory</a
+                                >
+                                (<a
+                                    href="../lessons/05-physical-ram-and-address-translation.html"
+                                    >From virtual address to RAM</a
+                                >)
+                            </li>
+                            <li>
+                                Scheduling (computing) —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Scheduling_(computing)"
+                                    >https://en.wikipedia.org/wiki/Scheduling_(computing)</a
+                                >
+                                (<a
+                                    href="../lessons/03-programs-processes-and-the-kernel.html"
+                                    >Processes and the kernel</a
+                                >)
+                            </li>
+                            <li>
+                                Stack (abstract data type) —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Stack_(abstract_data_type)"
+                                    >https://en.wikipedia.org/wiki/Stack_(abstract_data_type)</a
+                                >
+                                (<a
+                                    href="../lessons/08-function-calls-and-stack-frames.html"
+                                    >Calls and stack frames</a
+                                >)
+                            </li>
+                            <li>
+                                Stack overflow —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Stack_overflow"
+                                    >https://en.wikipedia.org/wiki/Stack_overflow</a
+                                >
+                                (<a
+                                    href="../lessons/14-memory-bugs-and-rust-safety.html"
+                                    >Memory bugs and safety</a
+                                >)
+                            </li>
+                            <li>
+                                Stack-based memory allocation —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Stack-based_memory_allocation"
+                                    >https://en.wikipedia.org/wiki/Stack-based_memory_allocation</a
+                                >
+                                (<a
+                                    href="../lessons/08-function-calls-and-stack-frames.html"
+                                    >Calls and stack frames</a
+                                >)
+                            </li>
+                            <li>
+                                System call —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/System_call"
+                                    >https://en.wikipedia.org/wiki/System_call</a
+                                >
+                                (<a
+                                    href="../lessons/03-programs-processes-and-the-kernel.html"
+                                    >Processes and the kernel</a
+                                >)
+                            </li>
+                            <li>
+                                Thread (computing) —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Thread_(computing)"
+                                    >https://en.wikipedia.org/wiki/Thread_(computing)</a
+                                >
+                                (<a
+                                    href="../lessons/06-threads-and-their-stacks.html"
+                                    >Threads and their stacks</a
+                                >)
+                            </li>
+                            <li>
+                                Translation lookaside buffer —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Translation_lookaside_buffer"
+                                    >https://en.wikipedia.org/wiki/Translation_lookaside_buffer</a
+                                >
+                                (<a
+                                    href="../lessons/05-physical-ram-and-address-translation.html"
+                                    >From virtual address to RAM</a
+                                >)
+                            </li>
+                            <li>
+                                UTF-8 —
+                                <a href="https://en.wikipedia.org/wiki/UTF-8"
+                                    >https://en.wikipedia.org/wiki/UTF-8</a
+                                >
+                                (<a
+                                    href="../lessons/10-string-and-vec-memory.html"
+                                    >String and Vec</a
+                                >)
+                            </li>
+                            <li>
+                                Virtual memory —
+                                <a
+                                    href="https://en.wikipedia.org/wiki/Virtual_memory"
+                                    >https://en.wikipedia.org/wiki/Virtual_memory</a
+                                >
+                                (<a href="../lessons/04-virtual-memory.html"
+                                    >Inside an address space</a
+                                >, index)
+                            </li>
+                        </ul>
+                    </div>
+                </article>
+                <footer class="foot">
+                    <p>
+                        Observed values, such as addresses, sizes, assembly and
+                        program output, come from one machine. It runs Linux 7.0
+                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
+                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
+                        limit. Addresses change on every run, and other systems,
+                        toolchains and allocators can differ. Details:
+                        <a href="../reference/sources.html">Sources</a> ·
+                        <code>examples/OUTPUT.txt</code>.
+                    </p>
+                </footer>
+            </main>
+            <nav class="otp" aria-label="On this page">
+                <p class="otp__h">On this page</p>
+                <ol class="otp__list">
+                    <li class="lv2">
+                        <a href="#machine-used-for-observed-results"
+                            >Machine used for observed results</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#rust-language-and-standard-library"
+                            >Rust — language and standard library</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#linux-and-operating-systems"
+                            >Linux and operating systems</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#cpu-and-memory-hardware"
+                            >CPU and memory hardware</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#observed-on-the-machine-above"
+                            >Observed on the machine above</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#secondary-reading-not-used-as-proof"
+                            >Secondary reading (not used as proof)</a
+                        >
+                    </li>
+                </ol>
+            </nav>
+        </div>
+    </body>
+</html>

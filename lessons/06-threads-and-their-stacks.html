@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="en" class="no-js">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>
+            What do threads share, and what does each keep to itself? — How a
+            Rust program meets the machine
+        </title>
+        <meta
+            name="description"
+            content="What threads in one process share (the address space, code, globals, heap allocations) and what each thread has alone (registers and a call stack), with two thread lanes you can drive."
+        />
+        <link rel="stylesheet" href="../assets/css/site.css" />
+        <script src="../assets/js/site.js"></script>
+        <script src="../assets/js/diagrams.js" defer></script>
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to the text</a>
+        <header class="top">
+            <a class="top__title" href="../index.html"
+                >How a Rust program meets the machine</a
+            >
+            <span class="top__here">06 · Threads and their stacks</span>
+            <span class="top__spacer"></span>
+            <button
+                class="top__btn"
+                type="button"
+                data-toc-toggle
+                aria-expanded="false"
+                aria-controls="toc"
+            >
+                Contents
+            </button>
+        </header>
+        <div class="shell">
+            <nav class="toc" id="toc" aria-label="Contents">
+                <a class="toc__home" href="../index.html">The whole map</a>
+                <p class="toc__group">Before your code runs</p>
+                <ol>
+                    <li>
+                        <a href="01-what-is-a-program.html"
+                            ><span class="n">01</span
+                            ><span>What a program is</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="02-how-a-cpu-runs-code.html"
+                            ><span class="n">02</span
+                            ><span>How a CPU runs code</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="03-programs-processes-and-the-kernel.html"
+                            ><span class="n">03</span
+                            ><span>Processes and the kernel</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Addresses</p>
+                <ol>
+                    <li>
+                        <a href="04-virtual-memory.html"
+                            ><span class="n">04</span
+                            ><span>Inside an address space</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="05-physical-ram-and-address-translation.html"
+                            ><span class="n">05</span
+                            ><span>From virtual address to RAM</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="06-threads-and-their-stacks.html"
+                            aria-current="page"
+                            ><span class="n">06</span
+                            ><span>Threads and their stacks</span></a
+                        >
+                        <ol class="toc__sub">
+                            <li class="lv2">
+                                <a href="#what-each-thread-has-alone"
+                                    >What each thread has alone</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#two-threads-one-process"
+                                    >Two threads, one process</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a
+                                    href="#what-belongs-to-the-process-and-what-belongs-to-a-thread"
+                                    >What belongs to the process, and what
+                                    belongs to a thread</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#main-is-a-function-not-a-stack"
+                                    >main is a function, not a stack</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#how-big-is-a-stack"
+                                    >How big is a stack?</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#shared-does-not-mean-safe"
+                                    >Shared does not mean safe</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#keep-h">What to remember</a>
+                            </li>
+                            <li class="lv2">
+                                <a href="#test-h">Check your understanding</a>
+                            </li>
+                        </ol>
+                    </li>
+                    <li>
+                        <a href="07-registers-caches-and-a-memory-read.html"
+                            ><span class="n">07</span
+                            ><span>Caches and one load</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Calls and data</p>
+                <ol>
+                    <li>
+                        <a href="08-function-calls-and-stack-frames.html"
+                            ><span class="n">08</span
+                            ><span>Calls and stack frames</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="09-rust-values-stack-heap-and-box.html"
+                            ><span class="n">09</span
+                            ><span>Values, stack, heap, Box</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="10-string-and-vec-memory.html"
+                            ><span class="n">10</span
+                            ><span>String and Vec</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Rust's rules</p>
+                <ol>
+                    <li>
+                        <a href="11-ownership-moves-clone-and-drop.html"
+                            ><span class="n">11</span
+                            ><span>Ownership, moves, drop</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            ><span class="n">12</span
+                            ><span>References and lifetimes</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="13-iterators-and-following-data.html"
+                            ><span class="n">13</span><span>Iterators</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="14-memory-bugs-and-rust-safety.html"
+                            ><span class="n">14</span
+                            ><span>Memory bugs and safety</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">All together</p>
+                <ol>
+                    <li>
+                        <a href="15-follow-one-example-end-to-end.html"
+                            ><span class="n">15</span
+                            ><span>One call, every layer</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Reference</p>
+                <ul class="toc__ref">
+                    <li><a href="../reference/glossary.html">Glossary</a></li>
+                    <li><a href="../reference/sources.html">Sources</a></li>
+                    <li>
+                        <a href="../reference/concept-map.html">Concept map</a>
+                    </li>
+                </ul>
+            </nav>
+            <main id="main">
+                <article class="page">
+                    <header class="opening">
+                        <div class="opening__meta">
+                            <span class="opening__num">06</span
+                            ><span class="tag tag-os">Operating system</span>
+                        </div>
+                        <h1>
+                            What do threads share, and what does each keep to
+                            itself?
+                        </h1>
+                        <p class="why">
+                            The
+                            <a href="04-virtual-memory.html">memory map</a> of a
+                            real Rust process can show two stacks: one labelled
+                            <code>[stack]</code>, and an unlabelled range used
+                            by a second thread. A process can run several
+                            threads at once. They share almost everything, but
+                            each thread has its own stack.
+                        </p>
+                    </header>
+                    <ul
+                        class="legend"
+                        aria-label="Which layer each colour means"
+                    >
+                        <li><span class="sw sw-rust"></span>Rust language</li>
+                        <li>
+                            <span class="sw sw-comp"></span>Compiler &amp;
+                            runtime library
+                        </li>
+                        <li><span class="sw sw-os"></span>Operating system</li>
+                        <li>
+                            <span class="sw sw-hw"></span>CPU &amp; hardware
+                        </li>
+                    </ul>
+                    <p>
+                        A
+                        <a
+                            href="https://en.wikipedia.org/wiki/Thread_(computing)"
+                            class="ext"
+                            >thread</a
+                        >
+                        <span class="tag tag-os">OS</span> is one path of
+                        execution through a process: one instruction pointer
+                        moving through the code. Each process starts with one
+                        thread. It can create more, and the scheduler can run
+                        them at the same time on different cores, or take turns
+                        on one core.
+                    </p>
+                    <p>
+                        A thread is very much like a separate process, with one
+                        difference. Threads of the same process share one
+                        address space, so they can reach the same data
+                        <a
+                            class="src"
+                            href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf"
+                            >OSTEP ch. 26</a
+                        >. Linux's documentation puts it plainly: threads "share
+                        the same global memory (data and heap segments), but
+                        each thread has its own stack"
+                        <a
+                            class="src"
+                            href="https://man7.org/linux/man-pages/man7/pthreads.7.html"
+                            >pthreads(7)</a
+                        >.
+                    </p>
+
+                    <h2 id="what-each-thread-has-alone">
+                        What each thread has alone
+                    </h2>
+                    <p>
+                        To follow its own path, each thread needs its own
+                        <b>execution state</b>: its own register values,
+                        including its own instruction pointer and stack pointer.
+                        While a thread runs, those values sit in a core's
+                        registers. When the scheduler takes the core away, the
+                        kernel saves them, and loads them back when the thread
+                        runs again.
+                    </p>
+                    <p>
+                        Each thread also needs its own <b>call stack</b>. A
+                        stack records the chain of calls that are in progress:
+                        <code>main</code> called <code>total</code>, which is
+                        still running. Two threads are usually in the middle of
+                        different calls, so one shared stack could not record
+                        both chains. Every thread gets its own region of memory
+                        for its stack.
+                    </p>
+
+                    <h2 id="two-threads-one-process">
+                        Two threads, one process
+                    </h2>
+                    <p>
+                        This program starts a second thread. Both threads call
+                        <code>total</code> on the same vector:
+                    </p>
+                    <div class="codeblock codeblock--ok">
+                        <div class="codeblock__label">
+                            <span>examples/threads_scope.rs</span
+                            ><span class="verdict"
+                                >compiles · prints 60 60</span
+                            >
+                        </div>
+                        <pre><code><span class="k">fn</span> total(values: &amp;Vec&lt;i32&gt;) -&gt; i32 {
+    <span class="k">let mut</span> sum = 0;
+    <span class="k">for</span> v <span class="k">in</span> values.iter() { sum += v; }
+    sum
+}
+
+<span class="k">fn</span> main() {
+    <span class="k">let</span> scores = vec![10, 20, 30];
+    thread::scope(|s| {
+        <span class="k">let</span> h = s.spawn(|| total(&amp;scores));   <span class="c">// thread 2</span>
+        <span class="k">let</span> a = total(&amp;scores);              <span class="c">// thread 1, at the same time</span>
+        <span class="k">let</span> b = h.join().unwrap();
+        println!(<span class="c">"{a} {b}"</span>);
+    });
+}</code></pre>
+                    </div>
+
+                    <figure
+                        class="fig"
+                        data-fig="threads"
+                        data-label="threads diagram"
+                    >
+                        <div class="fig__head">
+                            <p class="fig__title">
+                                Shared address space, private stacks
+                            </p>
+                            <span class="fig__kind"
+                                >Conceptual · frame contents simplified</span
+                            >
+                        </div>
+                        <div class="fig__grid fig__grid--note">
+                            <div class="fig__body">
+                                <div class="tproc">
+                                    <div class="tproc__h">
+                                        Process 4101 · one address space
+                                    </div>
+                                    <div class="tshared">
+                                        <div class="tshared__h">
+                                            Shared by every thread in the
+                                            process
+                                        </div>
+                                        <div class="sbox">
+                                            <h5>Code</h5>
+                                            <code>main</code>,
+                                            <code>total</code>, the closure —
+                                            one copy
+                                        </div>
+                                        <div class="sbox">
+                                            <h5>Globals and statics</h5>
+                                            one copy of each <code>static</code>
+                                        </div>
+                                        <div class="sbox" id="t-buf">
+                                            <h5>Heap allocation</h5>
+                                            buffer of <code>scores</code>
+                                            <span class="cells cells--gap"
+                                                ><span class="cell">10</span
+                                                ><span class="cell">20</span
+                                                ><span class="cell"
+                                                    >30</span
+                                                ></span
+                                            >
+                                        </div>
+                                    </div>
+                                    <div class="lanes">
+                                        <div class="lane" data-lane="1">
+                                            <div class="lane__h">
+                                                <b>Thread 1 · initial thread</b
+                                                ><span class="note-sm"
+                                                    >its own stack</span
+                                                >
+                                            </div>
+                                            <div class="lane__regs">
+                                                IP in <b data-ip="1">main</b> ·
+                                                SP →
+                                                <b data-sp="1"
+                                                    >top of main's frame</b
+                                                >
+                                            </div>
+                                            <div
+                                                class="stackcol"
+                                                data-stack="1"
+                                            >
+                                                <div
+                                                    class="frm"
+                                                    data-f="main"
+                                                    id="t1-main"
+                                                >
+                                                    <b>main</b
+                                                    ><span class="slots"
+                                                        >scores: ptr · len 3 ·
+                                                        cap 3</span
+                                                    >
+                                                </div>
+                                                <div
+                                                    class="frm no-js-only"
+                                                    id="t1-total"
+                                                >
+                                                    <b>total</b
+                                                    ><span class="slots"
+                                                        >values: &amp;scores ·
+                                                        sum</span
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div class="stackcol__base">
+                                                stack: <code>[stack]</code>, set
+                                                up by the kernel
+                                            </div>
+                                        </div>
+                                        <div class="lane" data-lane="2">
+                                            <div class="lane__h">
+                                                <b>Thread 2 · spawned</b
+                                                ><span class="note-sm"
+                                                    >its own stack</span
+                                                >
+                                            </div>
+                                            <div class="lane__regs">
+                                                IP in
+                                                <b data-ip="2">closure</b> · SP
+                                                →
+                                                <b data-sp="2"
+                                                    >top of closure's frame</b
+                                                >
+                                            </div>
+                                            <div
+                                                class="stackcol"
+                                                data-stack="2"
+                                            >
+                                                <div
+                                                    class="frm"
+                                                    data-f="closure"
+                                                >
+                                                    <b>closure</b
+                                                    ><span class="slots"
+                                                        >captured:
+                                                        &amp;scores</span
+                                                    >
+                                                </div>
+                                                <div class="frm no-js-only">
+                                                    <b>total</b
+                                                    ><span class="slots"
+                                                        >values: &amp;scores ·
+                                                        sum</span
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div class="stackcol__base">
+                                                stack: anonymous mapping, about
+                                                2 MiB
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="controls">
+                                    <span class="controls__label"
+                                        >Thread 1</span
+                                    >
+                                    <button
+                                        class="btn"
+                                        type="button"
+                                        data-act="call 1"
+                                    >
+                                        call <code>total</code>
+                                    </button>
+                                    <button
+                                        class="btn"
+                                        type="button"
+                                        data-act="ret 1"
+                                    >
+                                        return
+                                    </button>
+                                    <span class="controls__sep"></span>
+                                    <span class="controls__label"
+                                        >Thread 2</span
+                                    >
+                                    <button
+                                        class="btn"
+                                        type="button"
+                                        data-act="call 2"
+                                    >
+                                        call <code>total</code>
+                                    </button>
+                                    <button
+                                        class="btn"
+                                        type="button"
+                                        data-act="ret 2"
+                                    >
+                                        return
+                                    </button>
+                                    <span class="controls__sep"></span>
+                                    <button
+                                        class="btn"
+                                        type="button"
+                                        data-act="reset"
+                                    >
+                                        Reset
+                                    </button>
+                                </div>
+                                <p class="now-says" aria-live="polite">
+                                    Each thread has its own stack. Arrows show
+                                    where a value in a frame points. Call or
+                                    return in one thread and watch the other.
+                                </p>
+                                <p class="no-js-only note-sm">
+                                    Static view: both threads are inside
+                                    <code>total</code>. Both
+                                    <code>values</code> references hold the
+                                    address of the same <code>scores</code>,
+                                    which owns the one shared buffer.
+                                </p>
+                            </div>
+                            <aside class="leaves-out">
+                                <h4>What this picture leaves out</h4>
+                                <ul>
+                                    <li>
+                                        In the real program,
+                                        <code>total(&amp;scores)</code> passes
+                                        the address of
+                                        <code>scores</code> itself;
+                                        <code>scores</code> holds the pointer to
+                                        the buffer. The arrows from
+                                        <code>total</code> go to
+                                        <code>scores</code>'s frame slot for
+                                        that reason.
+                                    </li>
+                                    <li>
+                                        Frames are simplified. With
+                                        optimisation, <code>total</code> might
+                                        be inlined and have no frame of its own.
+                                    </li>
+                                    <li>
+                                        Both threads only read here. Writing to
+                                        shared data from two threads needs
+                                        synchronisation; Rust checks this with
+                                        <code>Send</code> and <code>Sync</code>.
+                                    </li>
+                                </ul>
+                            </aside>
+                        </div>
+                    </figure>
+
+                    <p>
+                        Notice what the arrows say. Both threads'
+                        <code>total</code> frames point at <em>the same</em>
+                        <code>scores</code>, and <code>scores</code> points at
+                        the one buffer. Nothing was copied for the second
+                        thread. An address means the same thing in every thread
+                        of a process, because they all use the same
+                        <a href="05-physical-ram-and-address-translation.html"
+                            >page table</a
+                        >. Both threads share the process's address space, but
+                        they do not share one call stack.
+                    </p>
+
+                    <h2
+                        id="what-belongs-to-the-process-and-what-belongs-to-a-thread"
+                    >
+                        What belongs to the process, and what belongs to a
+                        thread
+                    </h2>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Shared by all threads of a process</th>
+                                    <th>Separate for each thread</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        The address space and page table: every
+                                        mapping in the process's memory map
+                                    </td>
+                                    <td>
+                                        Register values, including the
+                                        instruction pointer and stack pointer
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Machine code, globals and statics</td>
+                                    <td>
+                                        The call stack, in its own memory region
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        Heap allocations, such as the
+                                        <code>scores</code> buffer
+                                    </td>
+                                    <td>Thread ID</td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        Open file descriptors, current
+                                        directory, process ID, resource limits
+                                    </td>
+                                    <td>
+                                        Signal mask, <code>errno</code>,
+                                        scheduling priority
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="note-sm">
+                        Based on the Linux/POSIX lists in
+                        <a
+                            href="https://man7.org/linux/man-pages/man7/pthreads.7.html"
+                            >pthreads(7)</a
+                        >. Rust's thread-local storage
+                        (<code>thread_local!</code>) adds per-thread variables
+                        on top.
+                    </p>
+                    <p>
+                        A thread's stack is not secret from the other threads.
+                        It lives in the same address space, so another thread
+                        could reach it if it had its address. What is private is
+                        the <em>use</em>: only its own thread pushes and pops
+                        frames on it. Rust's rules make sure a reference to one
+                        thread's stack data cannot be handed to a thread that
+                        might outlive it. That is why the example uses
+                        <code>thread::scope</code>, which guarantees that the
+                        spawned thread finishes before <code>scores</code> goes
+                        away.
+                    </p>
+
+                    <h2 id="main-is-a-function-not-a-stack">
+                        <code>main</code> is a function, not a stack
+                    </h2>
+                    <p>
+                        People often call the initial thread's stack "the main
+                        stack". That is fine as a nickname, but the two words
+                        name different things. <code>main</code> is a function.
+                        Its call has a frame, near the bottom of the initial
+                        thread's stack, above the frames of the
+                        <a href="01-what-is-a-program.html">start-up code</a>
+                        that called it.
+                    </p>
+                    <p>
+                        The stack belongs to the thread. When
+                        <code>main</code> calls <code>total</code>,
+                        <code>total</code>'s frame goes on the same stack. A
+                        second thread never puts its frames there.
+                    </p>
+
+                    <h2 id="how-big-is-a-stack">How big is a stack?</h2>
+                    <p>
+                        There is no universal size. On this Linux machine, the
+                        initial thread's stack may grow up to 8 MiB, the limit
+                        set by <code>ulimit -s</code>; Rust does not choose it
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/std/thread/index.html#stack-size"
+                            >std::thread</a
+                        >.
+                    </p>
+                    <p>
+                        For threads made with <code>std::thread</code>, the Rust
+                        standard library currently picks a default of 2 MiB on
+                        its main platforms. Its documentation says this may
+                        change. You can choose another size with
+                        <code>Builder::stack_size</code> or the
+                        <code>RUST_MIN_STACK</code> variable. The second
+                        thread's stack in the
+                        <a href="04-virtual-memory.html">real memory map</a> was
+                        slightly more than 2 MiB. Other systems and settings
+                        give other numbers.
+                    </p>
+
+                    <h2 id="shared-does-not-mean-safe">
+                        Shared does not mean safe
+                    </h2>
+                    <p>
+                        If two threads can reach the same memory, they can also
+                        both write to it at the same moment. When at least one
+                        access is a write and nothing orders them, that is a
+                        <a
+                            href="https://en.wikipedia.org/wiki/Data_race"
+                            class="ext"
+                            >data race</a
+                        >, and in Rust it is undefined behaviour
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/reference/behavior-considered-undefined.html"
+                            >Rust Reference</a
+                        >. The hardware and the OS will not stop it: from their
+                        point of view, two threads writing to their own
+                        process's memory is allowed.
+                    </p>
+                    <p>
+                        Rust stops it at compile time instead
+                        <span class="tag tag-rust">Rust</span>. The marker
+                        traits <code>Send</code> ("safe to move to another
+                        thread") and <code>Sync</code> ("safe to share between
+                        threads")
+                        <a
+                            class="src"
+                            href="https://doc.rust-lang.org/nomicon/send-and-sync.html"
+                            >Rustonomicon</a
+                        >, together with the
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            >borrowing rules</a
+                        >, decide what may cross between threads. The example
+                        compiles because both threads only <em>read</em>
+                        <code>scores</code> through shared references. Change
+                        one of them to modify the vector, and the compiler
+                        refuses.
+                    </p>
+
+                    <section class="keep" aria-labelledby="keep-h">
+                        <h2 id="keep-h">What to remember</h2>
+                        <ol>
+                            <li>
+                                Threads of one process share the address space:
+                                code, globals and heap allocations.
+                            </li>
+                            <li>
+                                Each thread has its own registers and its own
+                                call stack.
+                            </li>
+                            <li>
+                                Sharing memory does not make sharing safe;
+                                Rust's <code>Send</code>/<code>Sync</code> and
+                                borrowing rules decide what may be shared.
+                            </li>
+                        </ol>
+                    </section>
+
+                    <section class="test" aria-labelledby="test-h">
+                        <h2 id="test-h">Check your understanding</h2>
+                        <details>
+                            <summary>
+                                Thread 2 reads <code>scores[0]</code>. Does it
+                                read a copy of the buffer?
+                            </summary>
+                            <div>
+                                <p>
+                                    No. It uses the same address as thread 1,
+                                    which leads to the same buffer, because both
+                                    threads use the process's one page table.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                Thread 1 calls a deeply recursive function. Does
+                                thread 2's stack fill up too?
+                            </summary>
+                            <div>
+                                <p>
+                                    No. Each thread has its own stack. Thread 1
+                                    can run out of its stack while thread 2's
+                                    stays as it was.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                Is "the main stack" the stack of the function
+                                <code>main</code>?
+                            </summary>
+                            <div>
+                                <p>
+                                    It is the stack of the initial thread.
+                                    <code>main</code>'s frame is one of the
+                                    frames on it, along with the start-up code's
+                                    frames and every function
+                                    <code>main</code> calls.
+                                </p>
+                            </div>
+                        </details>
+                    </section>
+
+                    <p class="related">
+                        <b>Related:</b>
+                        <a href="04-virtual-memory.html"
+                            >both stacks in a real map</a
+                        >
+                        ·
+                        <a href="08-function-calls-and-stack-frames.html"
+                            >what goes in a frame</a
+                        >
+                        ·
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            >shared references</a
+                        >
+                        ·
+                        <a href="14-memory-bugs-and-rust-safety.html"
+                            >running out of stack</a
+                        >
+                    </p>
+
+                    <p>
+                        <b>Next question:</b> when a thread reads
+                        <code>scores[1]</code>, the address is translated and
+                        the bytes arrive in a register.
+                        <a href="07-registers-caches-and-a-memory-read.html"
+                            >Where do those bytes actually come from?</a
+                        >
+                    </p>
+                    <nav class="pager" aria-label="Previous and next">
+                        <a
+                            class="pager__prev"
+                            href="05-physical-ram-and-address-translation.html"
+                            rel="prev"
+                            ><span class="pager__dir">← Previous</span
+                            ><span class="pager__q"
+                                >How does a virtual address reach physical
+                                RAM?</span
+                            ></a
+                        >
+                        <a
+                            class="pager__next"
+                            href="07-registers-caches-and-a-memory-read.html"
+                            rel="next"
+                            ><span class="pager__dir">Next →</span
+                            ><span class="pager__q"
+                                >Where do the bytes of one memory read come
+                                from?</span
+                            ></a
+                        >
+                    </nav>
+                </article>
+                <footer class="foot">
+                    <p>
+                        Observed values, such as addresses, sizes, assembly and
+                        program output, come from one machine. It runs Linux 7.0
+                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
+                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
+                        limit. Addresses change on every run, and other systems,
+                        toolchains and allocators can differ. Details:
+                        <a href="../reference/sources.html">Sources</a> ·
+                        <code>examples/OUTPUT.txt</code>.
+                    </p>
+                </footer>
+            </main>
+            <nav class="otp" aria-label="On this page">
+                <p class="otp__h">On this page</p>
+                <ol class="otp__list">
+                    <li class="lv2">
+                        <a href="#what-each-thread-has-alone"
+                            >What each thread has alone</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#two-threads-one-process"
+                            >Two threads, one process</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a
+                            href="#what-belongs-to-the-process-and-what-belongs-to-a-thread"
+                            >What belongs to the process, and what belongs to a
+                            thread</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#main-is-a-function-not-a-stack"
+                            >main is a function, not a stack</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#how-big-is-a-stack">How big is a stack?</a>
+                    </li>
+                    <li class="lv2">
+                        <a href="#shared-does-not-mean-safe"
+                            >Shared does not mean safe</a
+                        >
+                    </li>
+                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
+                    <li class="lv2">
+                        <a href="#test-h">Check your understanding</a>
+                    </li>
+                </ol>
+            </nav>
+        </div>
+    </body>
+</html>

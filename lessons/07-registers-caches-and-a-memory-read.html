@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en" class="no-js">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>
+            Where do the bytes of one memory read come from? — How a Rust
+            program meets the machine
+        </title>
+        <meta
+            name="description"
+            content="What happens during one load instruction: address translation through the TLB and page tables, then the data lookup through L1, L2 and L3 caches and RAM, with switchable hits and misses."
+        />
+        <link rel="stylesheet" href="../assets/css/site.css" />
+        <script src="../assets/js/site.js"></script>
+        <script src="../assets/js/diagrams.js" defer></script>
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to the text</a>
+        <header class="top">
+            <a class="top__title" href="../index.html"
+                >How a Rust program meets the machine</a
+            >
+            <span class="top__here">07 · Caches and one load</span>
+            <span class="top__spacer"></span>
+            <button
+                class="top__btn"
+                type="button"
+                data-toc-toggle
+                aria-expanded="false"
+                aria-controls="toc"
+            >
+                Contents
+            </button>
+        </header>
+        <div class="shell">
+            <nav class="toc" id="toc" aria-label="Contents">
+                <a class="toc__home" href="../index.html">The whole map</a>
+                <p class="toc__group">Before your code runs</p>
+                <ol>
+                    <li>
+                        <a href="01-what-is-a-program.html"
+                            ><span class="n">01</span
+                            ><span>What a program is</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="02-how-a-cpu-runs-code.html"
+                            ><span class="n">02</span
+                            ><span>How a CPU runs code</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="03-programs-processes-and-the-kernel.html"
+                            ><span class="n">03</span
+                            ><span>Processes and the kernel</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Addresses</p>
+                <ol>
+                    <li>
+                        <a href="04-virtual-memory.html"
+                            ><span class="n">04</span
+                            ><span>Inside an address space</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="05-physical-ram-and-address-translation.html"
+                            ><span class="n">05</span
+                            ><span>From virtual address to RAM</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="06-threads-and-their-stacks.html"
+                            ><span class="n">06</span
+                            ><span>Threads and their stacks</span></a
+                        >
+                    </li>
+                    <li>
+                        <a
+                            href="07-registers-caches-and-a-memory-read.html"
+                            aria-current="page"
+                            ><span class="n">07</span
+                            ><span>Caches and one load</span></a
+                        >
+                        <ol class="toc__sub">
+                            <li class="lv2">
+                                <a href="#registers-caches-ram"
+                                    >Registers, caches, RAM</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#the-fast-path-and-the-slow-path"
+                                    >The fast path and the slow path</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#who-moves-data-into-the-cache"
+                                    >Who moves data into the cache?</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#not-every-cpu-looks-like-this"
+                                    >Not every CPU looks like this</a
+                                >
+                            </li>
+                            <li class="lv2">
+                                <a href="#keep-h">What to remember</a>
+                            </li>
+                            <li class="lv2">
+                                <a href="#test-h">Check your understanding</a>
+                            </li>
+                        </ol>
+                    </li>
+                </ol>
+                <p class="toc__group">Calls and data</p>
+                <ol>
+                    <li>
+                        <a href="08-function-calls-and-stack-frames.html"
+                            ><span class="n">08</span
+                            ><span>Calls and stack frames</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="09-rust-values-stack-heap-and-box.html"
+                            ><span class="n">09</span
+                            ><span>Values, stack, heap, Box</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="10-string-and-vec-memory.html"
+                            ><span class="n">10</span
+                            ><span>String and Vec</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Rust's rules</p>
+                <ol>
+                    <li>
+                        <a href="11-ownership-moves-clone-and-drop.html"
+                            ><span class="n">11</span
+                            ><span>Ownership, moves, drop</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="12-references-borrowing-and-lifetimes.html"
+                            ><span class="n">12</span
+                            ><span>References and lifetimes</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="13-iterators-and-following-data.html"
+                            ><span class="n">13</span><span>Iterators</span></a
+                        >
+                    </li>
+                    <li>
+                        <a href="14-memory-bugs-and-rust-safety.html"
+                            ><span class="n">14</span
+                            ><span>Memory bugs and safety</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">All together</p>
+                <ol>
+                    <li>
+                        <a href="15-follow-one-example-end-to-end.html"
+                            ><span class="n">15</span
+                            ><span>One call, every layer</span></a
+                        >
+                    </li>
+                </ol>
+                <p class="toc__group">Reference</p>
+                <ul class="toc__ref">
+                    <li><a href="../reference/glossary.html">Glossary</a></li>
+                    <li><a href="../reference/sources.html">Sources</a></li>
+                    <li>
+                        <a href="../reference/concept-map.html">Concept map</a>
+                    </li>
+                </ul>
+            </nav>
+            <main id="main">
+                <article class="page">
+                    <header class="opening">
+                        <div class="opening__meta">
+                            <span class="opening__num">07</span
+                            ><span class="tag tag-hw">CPU &amp; hardware</span>
+                        </div>
+                        <h1>
+                            Where do the bytes of one memory read come from?
+                        </h1>
+                        <p class="why">
+                            A memory read has two halves. The
+                            <a
+                                href="05-physical-ram-and-address-translation.html"
+                                >virtual address is translated</a
+                            >
+                            into a physical one, and then the bytes have to come
+                            from somewhere: a CPU cache, or RAM. Here is one
+                            load from start to finish.
+                        </p>
+                    </header>
+                    <ul
+                        class="legend"
+                        aria-label="Which layer each colour means"
+                    >
+                        <li><span class="sw sw-rust"></span>Rust language</li>
+                        <li>
+                            <span class="sw sw-comp"></span>Compiler &amp;
+                            runtime library
+                        </li>
+                        <li><span class="sw sw-os"></span>Operating system</li>
+                        <li>
+                            <span class="sw sw-hw"></span>CPU &amp; hardware
+                        </li>
+                    </ul>
+                    <p>
+                        Take one instruction from the loop in
+                        <code>total</code>: reading <code>scores[1]</code>. On
+                        x86-64 it might look like
+                        <code>mov eax, dword ptr [rdi + 4]</code>: register
+                        <code>rdi</code> holds the address of the buffer, and
+                        the element is 4 bytes further on. In one recorded run
+                        of the example, the buffer started at
+                        <code>0x579e63956d50</code>, so this load asks for the 4
+                        bytes at <code>0x579e63956d54</code>.
+                    </p>
+                    <p>
+                        Two separate jobs have to happen before
+                        <code>eax</code> holds 20:
+                    </p>
+                    <ol>
+                        <li>
+                            <b>Translation</b>: find the
+                            <a
+                                href="05-physical-ram-and-address-translation.html"
+                                >physical address</a
+                            >
+                            for that virtual address.
+                        </li>
+                        <li>
+                            <b>Data lookup</b>: get the 4 bytes stored at that
+                            physical address.
+                        </li>
+                    </ol>
+                    <p>The second job is where caches come in.</p>
+
+                    <h2 id="registers-caches-ram">Registers, caches, RAM</h2>
+                    <p>
+                        Three kinds of storage are involved, and they do
+                        different jobs <span class="tag tag-hw">Hardware</span>.
+                    </p>
+                    <ul>
+                        <li>
+                            <b>Registers</b> are part of the core's
+                            <a href="02-how-a-cpu-runs-code.html"
+                                >execution state</a
+                            >. Instructions name them directly.
+                        </li>
+                        <li>
+                            <b>RAM</b> holds the contents of physical memory. It
+                            is large and, measured in CPU time, far away: a trip
+                            to RAM can cost as much time as hundreds of simple
+                            instructions
+                            <a
+                                class="src"
+                                href="https://www.akkadia.org/drepper/cpumemory.pdf"
+                                >Drepper §3</a
+                            >.
+                        </li>
+                        <li>
+                            <a
+                                href="https://en.wikipedia.org/wiki/CPU_cache"
+                                class="ext"
+                                >Caches</a
+                            >
+                            sit between the two. They are small, fast memories
+                            inside the CPU that keep <em>copies</em> of recently
+                            used parts of RAM. Each cache is usually a
+                            <span class="term">level</span>: L1 is smallest and
+                            fastest and is checked first; L2 is bigger and
+                            slower; L3 is bigger and slower again, and often
+                            shared by several cores.
+                        </li>
+                    </ul>
+                    <p>
+                        Caches do not store single bytes. They store
+                        <span class="term">cache lines</span>, fixed-size blocks
+                        of memory. When a byte is needed, its whole line is
+                        brought in. On the laptop the examples were run on, a
+                        line is 64 bytes (<code
+                            >getconf LEVEL1_DCACHE_LINESIZE</code
+                        >).
+                    </p>
+
+                    <figure
+                        class="fig"
+                        data-fig="load"
+                        data-label="memory read diagram"
+                    >
+                        <div class="fig__head">
+                            <p class="fig__title">
+                                One load: <code>mov eax, [rdi + 4]</code> reads
+                                <code>scores[1]</code>
+                            </p>
+                            <span class="fig__kind"
+                                >Common design · simplified · no timings</span
+                            >
+                        </div>
+                        <div class="controls">
+                            <span class="controls__label">Translation</span>
+                            <div class="seg" data-choice="tlb">
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="hit"
+                                    aria-pressed="true"
+                                >
+                                    TLB hit
+                                </button>
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="miss"
+                                >
+                                    TLB miss
+                                </button>
+                            </div>
+                            <span class="controls__sep"></span>
+                            <span class="controls__label">Data found in</span>
+                            <div class="seg" data-choice="level">
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="l1"
+                                    aria-pressed="true"
+                                >
+                                    L1
+                                </button>
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="l2"
+                                >
+                                    L2
+                                </button>
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="l3"
+                                >
+                                    L3
+                                </button>
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    data-value="ram"
+                                >
+                                    RAM
+                                </button>
+                            </div>
+                        </div>
+                        <div class="fig__grid fig__grid--note">
+                            <div class="fig__body">
+                                <div class="load">
+                                    <div class="path">
+                                        <div class="path__h">
+                                            1 · Translation
+                                            <span>virtual → physical</span>
+                                        </div>
+                                        <div class="hop lvl-hw" data-hop="va">
+                                            <div>
+                                                <b>Virtual address</b
+                                                ><small
+                                                    ><code>0x579e63956d54</code>
+                                                    from
+                                                    <code>rdi + 4</code></small
+                                                >
+                                            </div>
+                                        </div>
+                                        <div class="hop lvl-hw" data-hop="tlb">
+                                            <div>
+                                                <b>TLB</b
+                                                ><small
+                                                    >recent translations, inside
+                                                    the MMU</small
+                                                >
+                                            </div>
+                                            <span class="res"></span>
+                                        </div>
+                                        <div class="hop lvl-os" data-hop="walk">
+                                            <div>
+                                                <b>Page-table walk</b
+                                                ><small
+                                                    >hardware reads the kernel's
+                                                    tables in memory</small
+                                                >
+                                            </div>
+                                            <span class="res"></span>
+                                        </div>
+                                        <div class="hop lvl-hw" data-hop="pa">
+                                            <div>
+                                                <b>Physical address</b
+                                                ><small
+                                                    >frame from the table,
+                                                    offset
+                                                    <code>0xd54</code>
+                                                    unchanged</small
+                                                >
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="path">
+                                        <div class="path__h">
+                                            2 · Data lookup
+                                            <span
+                                                >physical address → bytes</span
+                                            >
+                                        </div>
+                                        <div class="hop lvl-hw" data-hop="l1">
+                                            <div>
+                                                <b>L1 data cache</b
+                                                ><small
+                                                    >smallest, checked first,
+                                                    private to the core</small
+                                                >
+                                            </div>
+                                            <span class="res"></span>
+                                        </div>
+                                        <div class="hop lvl-hw" data-hop="l2">
+                                            <div>
+                                                <b>L2 cache</b
+                                                ><small>larger, slower</small>
+                                            </div>
+                                            <span class="res"></span>
+                                        </div>
+                                        <div class="hop lvl-hw" data-hop="l3">
+                                            <div>
+                                                <b>L3 cache</b
+                                                ><small
+                                                    >larger again, often shared
+                                                    between cores</small
+                                                >
+                                            </div>
+                                            <span class="res"></span>
+                                        </div>
+                                        <div class="hop lvl-hw" data-hop="ram">
+                                            <div>
+                                                <b>RAM</b
+                                                ><small
+                                                    >main memory, outside the
+                                                    CPU</small
+                                                >
+                                            </div>
+                                            <span class="res"></span>
+                                        </div>
+                                        <div class="hop lvl-hw" data-hop="reg">
+                                            <div>
+                                                <b
+                                                    >Register <code>eax</code> =
+                                                    20</b
+                                                ><small
+                                                    >the 4 bytes of
+                                                    <code
+                                                        >scores[1]</code
+                                                    ></small
+                                                >
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 1rem">
+                                    <p class="note-sm">
+                                        <b
+                                            >The 64-byte cache line that holds
+                                            <code>scores</code></b
+                                        >
+                                        (16 slots of 4 bytes; the buffer starts
+                                        at <code>…d50</code>, 16 bytes into its
+                                        line):
+                                    </p>
+                                    <div class="line64" aria-label="cache line">
+                                        <span>d40</span><span>d44</span
+                                        ><span>d48</span><span>d4c</span
+                                        ><span class="el">10</span
+                                        ><span class="el is-now">20</span
+                                        ><span class="el">30</span
+                                        ><span>d5c</span><span>d60</span
+                                        ><span>d64</span><span>d68</span
+                                        ><span>d6c</span><span>d70</span
+                                        ><span>d74</span><span>d78</span
+                                        ><span>d7c</span>
+                                    </div>
+                                    <p
+                                        class="note-sm"
+                                        style="margin-top: 0.4rem"
+                                    >
+                                        Whatever level supplies the data, the
+                                        whole line comes with it. The next
+                                        iteration, reading
+                                        <code>scores[2]</code>, will very likely
+                                        find it already in L1.
+                                    </p>
+                                </div>
+                                <div
+                                    class="controls"
+                                    data-stepper-controls
+                                ></div>
+                                <p class="now-says" aria-live="polite"></p>
+                                <ol class="steps">
+                                    <li>
+                                        The core computes the virtual address
+                                        <code>rdi + 4</code>.
+                                    </li>
+                                    <li>
+                                        The MMU checks the TLB for this page. On
+                                        a hit, it has the frame at once. On a
+                                        miss, the hardware walks the page tables
+                                        in memory and fills the TLB; those
+                                        page-table reads can themselves hit in
+                                        the caches.
+                                    </li>
+                                    <li>
+                                        The physical address is ready: the frame
+                                        from the translation, with the same
+                                        offset.
+                                    </li>
+                                    <li>
+                                        The data lookup starts at L1. On a hit,
+                                        the bytes come from there. On a miss, L2
+                                        is checked, then L3, then RAM.
+                                    </li>
+                                    <li>
+                                        The line containing
+                                        <code>scores[1]</code> is copied into
+                                        the faster levels on the way back, and
+                                        20 is written into <code>eax</code>.
+                                    </li>
+                                </ol>
+                            </div>
+                            <aside class="leaves-out">
+                                <h4>What this picture leaves out</h4>
+                                <ul>
+                                    <li>
+                                        Many CPUs start the L1 lookup while the
+                                        TLB is still translating, because the
+                                        line's position in L1 can be chosen from
+                                        the page offset alone. The two lanes
+                                        overlap in time.
+                                    </li>
+                                    <li>
+                                        Whether a line is kept in several levels
+                                        at once, and where it goes on the way
+                                        back, differs between designs.
+                                    </li>
+                                    <li>
+                                        Cores also prefetch lines they predict
+                                        will be needed, and run other
+                                        instructions while a miss is pending.
+                                    </li>
+                                    <li>
+                                        Instruction fetches use their own L1
+                                        instruction cache and their own TLB
+                                        entries.
+                                    </li>
+                                </ul>
+                            </aside>
+                        </div>
+                    </figure>
+
+                    <h2 id="the-fast-path-and-the-slow-path">
+                        The fast path and the slow path
+                    </h2>
+                    <p>
+                        Most loads in a program like <code>total</code> take the
+                        fast path: TLB hit and L1 hit. The loop walks through
+                        memory in order. After the first element of a line
+                        arrives, the next few are already in L1. Every element
+                        in the same 4 KiB page reuses the same TLB entry
+                        <a
+                            class="src"
+                            href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-tlbs.pdf"
+                            >OSTEP ch. 19</a
+                        >.
+                    </p>
+                    <p>
+                        Data close together in memory and used close together in
+                        time is the pattern caches reward. It is called
+                        <a
+                            href="https://en.wikipedia.org/wiki/Locality_of_reference"
+                            class="ext"
+                            >locality</a
+                        >.
+                    </p>
+                    <p>
+                        The slow path is a miss at every level, so the line has
+                        to come from RAM. If the TLB missed too, the page tables
+                        have to be read first. Each step down the
+                        <a
+                            href="https://en.wikipedia.org/wiki/Memory_hierarchy"
+                            class="ext"
+                            >memory hierarchy</a
+                        >
+                        costs more time. Exact costs depend on the CPU, so no
+                        numbers are given here. Drepper's 2007 measurements show
+                        the pattern: a few cycles for L1, around ten for L2, and
+                        hundreds for main memory
+                        <a
+                            class="src"
+                            href="https://www.akkadia.org/drepper/cpumemory.pdf"
+                            >Drepper §3.3</a
+                        >.
+                    </p>
+
+                    <h2 id="who-moves-data-into-the-cache">
+                        Who moves data into the cache?
+                    </h2>
+                    <p>
+                        Not your program. There is no Rust statement, and
+                        normally no instruction in your program, that says "put
+                        this in L1". The cache hardware decides what to keep and
+                        what to evict, on every access
+                        <a
+                            class="src"
+                            href="https://www.akkadia.org/drepper/cpumemory.pdf"
+                            >Drepper §3</a
+                        >.
+                    </p>
+                    <p>
+                        Architectures do offer special instructions for hints
+                        and for flushing lines, and kernels use some of them.
+                        Ordinary code only influences the cache indirectly,
+                        through the order in which it touches memory. The cache
+                        is a hardware layer beneath your program's memory model;
+                        it does not decide Rust ownership.
+                    </p>
+
+                    <h2 id="not-every-cpu-looks-like-this">
+                        Not every CPU looks like this
+                    </h2>
+                    <p>
+                        L1/L2/L3 is a common arrangement, not a rule. The laptop
+                        the examples were run on has two kinds of core.
+                        <code>lscpu</code> reports 8 L1 data caches (one per
+                        core), but only 5 L2 caches and 1 L3. Each fast core has
+                        its own L2, the four efficiency cores share one L2
+                        between them, and all eight share the L3. Other chips
+                        have two levels, or four, or share them differently. The
+                        figure shows the shape that is typical for desktop and
+                        server CPUs; it does not promise that shape.
+                    </p>
+
+                    <div class="aside aside--wrong">
+                        <p class="aside__h">
+                            Two tempting pictures that are wrong
+                        </p>
+                        <p>
+                            "The CPU asks RAM for every value." Most loads in
+                            ordinary code are served by a cache, and many values
+                            never leave registers at all.
+                        </p>
+                        <p>
+                            "The TLB is the first-level cache." The TLB holds
+                            translations. The L1 data cache holds memory
+                            contents. A load uses both, for different jobs.
+                        </p>
+                    </div>
+
+                    <section class="keep" aria-labelledby="keep-h">
+                        <h2 id="keep-h">What to remember</h2>
+                        <ol>
+                            <li>
+                                A load has two jobs: translate the address (TLB,
+                                page tables) and fetch the data (caches, RAM).
+                            </li>
+                            <li>
+                                Caches hold copies of memory in lines, and the
+                                hardware decides what they hold.
+                            </li>
+                            <li>
+                                Cache levels, sizes and sharing differ between
+                                CPUs; L1/L2/L3 is only the common case.
+                            </li>
+                        </ol>
+                    </section>
+
+                    <section class="test" aria-labelledby="test-h">
+                        <h2 id="test-h">Check your understanding</h2>
+                        <details>
+                            <summary>
+                                A load gets a TLB hit and an L1 miss. Was the
+                                page table read?
+                            </summary>
+                            <div>
+                                <p>
+                                    No. The TLB supplied the translation. The L1
+                                    miss only means the data has to come from a
+                                    lower cache level or from RAM.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                Why is summing a <code>Vec</code> in order
+                                usually fast?
+                            </summary>
+                            <div>
+                                <p>
+                                    Its elements are next to each other. Each
+                                    cache line brings several elements at once,
+                                    and each 4 KiB page needs only one TLB
+                                    entry, so most loads hit.
+                                </p>
+                            </div>
+                        </details>
+                        <details>
+                            <summary>
+                                Does the Rust compiler decide which values stay
+                                in the L1 cache?
+                            </summary>
+                            <div>
+                                <p>
+                                    No. The compiler decides which values stay
+                                    in registers and which go to memory. Which
+                                    memory lines are cached is decided by the
+                                    hardware at run time.
+                                </p>
+                            </div>
+                        </details>
+                    </section>
+
+                    <p class="related">
+                        <b>Related:</b>
+                        <a href="05-physical-ram-and-address-translation.html"
+                            >translation in detail</a
+                        >
+                        ·
+                        <a href="02-how-a-cpu-runs-code.html"
+                            >registers and loads</a
+                        >
+                        ·
+                        <a href="10-string-and-vec-memory.html"
+                            >why a <code>Vec</code>'s elements are next to each
+                            other</a
+                        >
+                        ·
+                        <a href="15-follow-one-example-end-to-end.html"
+                            >the whole path at once</a
+                        >
+                    </p>
+
+                    <p>
+                        <b>Next question:</b> the load used <code>rdi</code>,
+                        set up by a call.
+                        <a href="08-function-calls-and-stack-frames.html"
+                            >What happens on a thread's stack when one function
+                            calls another?</a
+                        >
+                    </p>
+                    <nav class="pager" aria-label="Previous and next">
+                        <a
+                            class="pager__prev"
+                            href="06-threads-and-their-stacks.html"
+                            rel="prev"
+                            ><span class="pager__dir">← Previous</span
+                            ><span class="pager__q"
+                                >What do threads share, and what does each keep
+                                to itself?</span
+                            ></a
+                        >
+                        <a
+                            class="pager__next"
+                            href="08-function-calls-and-stack-frames.html"
+                            rel="next"
+                            ><span class="pager__dir">Next →</span
+                            ><span class="pager__q"
+                                >What happens on the stack when one function
+                                calls another?</span
+                            ></a
+                        >
+                    </nav>
+                </article>
+                <footer class="foot">
+                    <p>
+                        Observed values, such as addresses, sizes, assembly and
+                        program output, come from one machine. It runs Linux 7.0
+                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
+                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
+                        limit. Addresses change on every run, and other systems,
+                        toolchains and allocators can differ. Details:
+                        <a href="../reference/sources.html">Sources</a> ·
+                        <code>examples/OUTPUT.txt</code>.
+                    </p>
+                </footer>
+            </main>
+            <nav class="otp" aria-label="On this page">
+                <p class="otp__h">On this page</p>
+                <ol class="otp__list">
+                    <li class="lv2">
+                        <a href="#registers-caches-ram"
+                            >Registers, caches, RAM</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#the-fast-path-and-the-slow-path"
+                            >The fast path and the slow path</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#who-moves-data-into-the-cache"
+                            >Who moves data into the cache?</a
+                        >
+                    </li>
+                    <li class="lv2">
+                        <a href="#not-every-cpu-looks-like-this"
+                            >Not every CPU looks like this</a
+                        >
+                    </li>
+                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
+                    <li class="lv2">
+                        <a href="#test-h">Check your understanding</a>
+                    </li>
+                </ol>
+            </nav>
+        </div>
+    </body>
+</html>
