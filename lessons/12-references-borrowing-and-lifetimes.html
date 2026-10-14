@@ -1,792 +1,214 @@
 <!doctype html>
 <html lang="en" class="no-js">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>
-            How can code use a value it does not own? — How a Rust program meets
-            the machine
-        </title>
-        <meta
-            name="description"
-            content="How code uses a value without owning it: what a reference holds in memory, the two borrowing rules, how long a borrow lasts, what lifetimes describe, and where the compiler stops checking."
-        />
-        <link rel="stylesheet" href="../assets/css/site.css" />
-        <script src="../assets/js/site.js"></script>
-        <script src="../assets/js/diagrams.js" defer></script>
-    </head>
-    <body>
-        <a class="skip" href="#main">Skip to the text</a>
-        <header class="top">
-            <a class="top__title" href="../index.html"
-                >How a Rust program meets the machine</a
-            >
-            <span class="top__here">12 · References and lifetimes</span>
-            <span class="top__spacer"></span>
-            <button
-                class="top__btn"
-                type="button"
-                data-toc-toggle
-                aria-expanded="false"
-                aria-controls="toc"
-            >
-                Contents
-            </button>
-        </header>
-        <div class="shell">
-            <nav class="toc" id="toc" aria-label="Contents">
-                <a class="toc__home" href="../index.html">The whole map</a>
-                <p class="toc__group">Before your code runs</p>
-                <ol>
-                    <li>
-                        <a href="01-what-is-a-program.html"
-                            ><span class="n">01</span
-                            ><span>What a program is</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="02-how-a-cpu-runs-code.html"
-                            ><span class="n">02</span
-                            ><span>How a CPU runs code</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="03-programs-processes-and-the-kernel.html"
-                            ><span class="n">03</span
-                            ><span>Processes and the kernel</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Addresses</p>
-                <ol>
-                    <li>
-                        <a href="04-virtual-memory.html"
-                            ><span class="n">04</span
-                            ><span>Inside an address space</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="05-physical-ram-and-address-translation.html"
-                            ><span class="n">05</span
-                            ><span>From virtual address to RAM</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="06-threads-and-their-stacks.html"
-                            ><span class="n">06</span
-                            ><span>Threads and their stacks</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="07-registers-caches-and-a-memory-read.html"
-                            ><span class="n">07</span
-                            ><span>Caches and one load</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Calls and data</p>
-                <ol>
-                    <li>
-                        <a href="08-function-calls-and-stack-frames.html"
-                            ><span class="n">08</span
-                            ><span>Calls and stack frames</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="09-rust-values-stack-heap-and-box.html"
-                            ><span class="n">09</span
-                            ><span>Values, stack, heap, Box</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="10-string-and-vec-memory.html"
-                            ><span class="n">10</span
-                            ><span>String and Vec</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Rust's rules</p>
-                <ol>
-                    <li>
-                        <a href="11-ownership-moves-clone-and-drop.html"
-                            ><span class="n">11</span
-                            ><span>Ownership, moves, drop</span></a
-                        >
-                    </li>
-                    <li>
-                        <a
-                            href="12-references-borrowing-and-lifetimes.html"
-                            aria-current="page"
-                            ><span class="n">12</span
-                            ><span>References and lifetimes</span></a
-                        >
-                        <ol class="toc__sub">
-                            <li class="lv2">
-                                <a
-                                    href="#a-reference-is-a-small-value-that-holds-an-address"
-                                    >A reference is a small value that holds an
-                                    address</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#the-two-rules">The two rules</a>
-                            </li>
-                            <li class="lv2">
-                                <a href="#how-long-a-borrow-lasts"
-                                    >How long a borrow lasts</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a
-                                    href="#lifetimes-what-a-reference-may-outlive"
-                                    >Lifetimes: what a reference may outlive</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#where-checking-stops-unsafe"
-                                    >Where checking stops: unsafe</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#keep-h">What to remember</a>
-                            </li>
-                            <li class="lv2">
-                                <a href="#test-h">Check your understanding</a>
-                            </li>
-                        </ol>
-                    </li>
-                    <li>
-                        <a href="13-iterators-and-following-data.html"
-                            ><span class="n">13</span><span>Iterators</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="14-memory-bugs-and-rust-safety.html"
-                            ><span class="n">14</span
-                            ><span>Memory bugs and safety</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">All together</p>
-                <ol>
-                    <li>
-                        <a href="15-follow-one-example-end-to-end.html"
-                            ><span class="n">15</span
-                            ><span>One call, every layer</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Reference</p>
-                <ul class="toc__ref">
-                    <li><a href="../reference/glossary.html">Glossary</a></li>
-                    <li><a href="../reference/sources.html">Sources</a></li>
-                    <li>
-                        <a href="../reference/concept-map.html">Concept map</a>
-                    </li>
-                </ul>
-            </nav>
-            <main id="main">
-                <article class="page">
-                    <header class="opening">
-                        <div class="opening__meta">
-                            <span class="opening__num">12</span
-                            ><span class="tag tag-rust">Rust</span>
-                        </div>
-                        <h1>How can code use a value it does not own?</h1>
-                        <p class="why">
-                            <a href="11-ownership-moves-clone-and-drop.html"
-                                >Moving</a
-                            >
-                            <code>scores</code> into a function would leave the
-                            caller without it. Most code only needs to read or
-                            change a value for a while and then give it back.
-                            References do that, and the rules around them are
-                            what stop a pointer from outliving the memory it
-                            points to.
-                        </p>
-                    </header>
-                    <ul
-                        class="legend"
-                        aria-label="Which layer each colour means"
-                    >
-                        <li><span class="sw sw-rust"></span>Rust language</li>
-                        <li>
-                            <span class="sw sw-comp"></span>Compiler &amp;
-                            runtime library
-                        </li>
-                        <li><span class="sw sw-os"></span>Operating system</li>
-                        <li>
-                            <span class="sw sw-hw"></span>CPU &amp; hardware
-                        </li>
-                    </ul>
-                    <h2 id="a-reference-is-a-small-value-that-holds-an-address">
-                        A reference is a small value that holds an address
-                    </h2>
-                    <p>
-                        <code>&amp;scores</code> creates a
-                        <span class="term">reference</span>: a value whose
-                        content is the address of <code>scores</code>. Creating
-                        one is called <span class="term">borrowing</span>. The
-                        reference does not own anything, so dropping it frees
-                        nothing
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html"
-                            >The Book §4.2</a
-                        >. At the machine level a reference is a
-                        <a
-                            href="https://en.wikipedia.org/wiki/Pointer_(computer_programming)"
-                            class="ext"
-                            >pointer</a
-                        >
-                        <span class="tag tag-comp">Compiler</span>; what makes
-                        it a reference is the set of rules the compiler checks
-                        about it <span class="tag tag-rust">Rust</span>.
-                    </p>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How can code use a value it does not own? — How a Rust program meets the machine</title>
+<meta name="description" content="How code uses a value without owning it: what a reference holds in memory, the two borrowing rules, how long a borrow lasts, what lifetimes describe, and where the compiler stops checking.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/diagrams.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the text</a>
+<header class="top">
+  <a class="top__title" href="../index.html">How a Rust program meets the machine</a>
+  <span class="top__here">12 · References and lifetimes</span>
+  <span class="top__spacer"></span>
+  <button class="top__btn" type="button" data-toc-toggle aria-expanded="false" aria-controls="toc">Contents</button>
+</header>
+<div class="shell">
+<nav class="toc" id="toc" aria-label="Contents">
+<a class="toc__home" href="../index.html">The whole map</a>
+<p class="toc__group">Before your code runs</p><ol>
+<li><a href="01-what-is-a-program.html"><span class="n">01</span><span>What a program is</span></a></li>
+<li><a href="02-how-a-cpu-runs-code.html"><span class="n">02</span><span>How a CPU runs code</span></a></li>
+<li><a href="03-programs-processes-and-the-kernel.html"><span class="n">03</span><span>Processes and the kernel</span></a></li>
+</ol>
+<p class="toc__group">Addresses</p><ol>
+<li><a href="04-virtual-memory.html"><span class="n">04</span><span>Inside an address space</span></a></li>
+<li><a href="05-physical-ram-and-address-translation.html"><span class="n">05</span><span>From virtual address to RAM</span></a></li>
+<li><a href="06-threads-and-their-stacks.html"><span class="n">06</span><span>Threads and their stacks</span></a></li>
+<li><a href="07-registers-caches-and-a-memory-read.html"><span class="n">07</span><span>Caches and one load</span></a></li>
+</ol>
+<p class="toc__group">Calls and data</p><ol>
+<li><a href="08-function-calls-and-stack-frames.html"><span class="n">08</span><span>Calls and stack frames</span></a></li>
+<li><a href="09-rust-values-stack-heap-and-box.html"><span class="n">09</span><span>Values, stack, heap, Box</span></a></li>
+<li><a href="10-string-and-vec-memory.html"><span class="n">10</span><span>String and Vec</span></a></li>
+</ol>
+<p class="toc__group">Rust's rules</p><ol>
+<li><a href="11-ownership-moves-clone-and-drop.html"><span class="n">11</span><span>Ownership, moves, drop</span></a></li>
+<li><a href="12-references-borrowing-and-lifetimes.html" aria-current="page"><span class="n">12</span><span>References and lifetimes</span></a><ol class="toc__sub"><li class="lv2"><a href="#a-reference-is-a-small-value-that-holds-an-address">A reference is a small value that holds an address</a></li><li class="lv2"><a href="#the-two-rules">The two rules</a></li><li class="lv2"><a href="#how-long-a-borrow-lasts">How long a borrow lasts</a></li><li class="lv2"><a href="#lifetimes-what-a-reference-may-outlive">Lifetimes: what a reference may outlive</a></li><li class="lv2"><a href="#where-checking-stops-unsafe">Where checking stops: unsafe</a></li><li class="lv2"><a href="#keep-h">What to remember</a></li><li class="lv2"><a href="#test-h">Check your understanding</a></li></ol></li>
+<li><a href="13-iterators-and-following-data.html"><span class="n">13</span><span>Iterators</span></a></li>
+<li><a href="14-memory-bugs-and-rust-safety.html"><span class="n">14</span><span>Memory bugs and safety</span></a></li>
+</ol>
+<p class="toc__group">All together</p><ol>
+<li><a href="15-follow-one-example-end-to-end.html"><span class="n">15</span><span>One call, every layer</span></a></li>
+</ol>
+<p class="toc__group">Reference</p><ul class="toc__ref">
+<li><a href="../reference/glossary.html">Glossary</a></li>
+<li><a href="../reference/sources.html">Sources</a></li>
+<li><a href="../reference/concept-map.html">Concept map</a></li>
+</ul>
+</nav>
+<main id="main">
+<article class="page">
+<header class="opening">
+  <div class="opening__meta"><span class="opening__num">12</span><span class="tag tag-rust">Rust</span></div>
+  <h1>How can code use a value it does not own?</h1>
+  <p class="why"><a href="11-ownership-moves-clone-and-drop.html">Moving</a> <code>scores</code> into a function would leave the caller without it. Most code only needs to read or change a value for a while and then give it back. References do that, and the rules around them are what stop a pointer from outliving the memory it points to.</p>
+</header>
+<ul class="legend" aria-label="Which layer each colour means"><li><span class="sw sw-rust"></span>Rust language</li><li><span class="sw sw-comp"></span>Compiler &amp; runtime library</li><li><span class="sw sw-os"></span>Operating system</li><li><span class="sw sw-hw"></span>CPU &amp; hardware</li></ul>
+<h2 id="a-reference-is-a-small-value-that-holds-an-address">A reference is a small value that holds an address</h2>
+<p>
+  <code>&amp;scores</code> creates a <span class="term">reference</span>: a value whose content is the address of <code>scores</code>. Creating one is called <span class="term">borrowing</span>. The reference does not own anything, so dropping it frees nothing <a class="src" href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html">The Book §4.2</a>. At the machine level a reference is a <a href="https://en.wikipedia.org/wiki/Pointer_(computer_programming)" class="ext">pointer</a> <span class="tag tag-comp">Compiler</span>; what makes it a reference is the set of rules the compiler checks about it <span class="tag tag-rust">Rust</span>.
+</p>
 
-                    <figure
-                        class="fig"
-                        data-fig="wires"
-                        data-label="reference diagram"
-                    >
-                        <div class="fig__head">
-                            <p class="fig__title">
-                                Two references, two different targets
-                            </p>
-                            <span class="fig__kind"
-                                >Addresses from one run of refs.rs ·
-                                shortened</span
-                            >
-                        </div>
-                        <div class="fig__grid fig__grid--note">
-                            <div class="fig__body">
-                                <div class="refdraw">
-                                    <div class="refdraw__refs">
-                                        <div class="rd-r1">
-                                            <span
-                                                class="refbox"
-                                                data-wire-to="rd-handle"
-                                                data-wire-cls="ref"
-                                                data-wire-side="right>left"
-                                                data-wire-side-sm="top>bottom"
-                                                >r1: &amp;Vec&lt;i32&gt; =
-                                                0x7fff…9d08</span
-                                            >
-                                            <small>8 bytes: one address</small>
-                                        </div>
-                                        <div class="rd-r2">
-                                            <span
-                                                class="refbox"
-                                                data-wire-to="rd-cell0"
-                                                data-wire-cls="ref"
-                                                data-wire-side="bottom>top"
-                                                data-wire-side-sm="bottom>top"
-                                                >&amp;scores[0]: &amp;i32 =
-                                                0x5792…bd50</span
-                                            >
-                                            <small
-                                                >8 bytes: the address of one
-                                                element</small
-                                            >
-                                        </div>
-                                    </div>
-                                    <div class="refdraw__mem">
-                                        <div class="rd-handle">
-                                            <div class="handle-row">
-                                                <div
-                                                    class="handle"
-                                                    id="rd-handle"
-                                                >
-                                                    <div>
-                                                        <small>ptr</small
-                                                        ><b>…bd50</b>
-                                                    </div>
-                                                    <div>
-                                                        <small>len</small
-                                                        ><b>2</b>
-                                                    </div>
-                                                    <div>
-                                                        <small>cap</small
-                                                        ><b>2</b>
-                                                    </div>
-                                                </div>
-                                                <span class="name">scores</span>
-                                            </div>
-                                            <p
-                                                class="note-sm"
-                                                style="margin-top: 0.3rem"
-                                            >
-                                                the <code>Vec</code> handle, at
-                                                <code>0x7fff…9d08</code> in
-                                                <code>main</code>'s frame
-                                            </p>
-                                        </div>
-                                        <div class="heap-zone rd-heap">
-                                            <div class="heap-zone__h">Heap</div>
-                                            <div class="bufs">
-                                                <div class="buf">
-                                                    <span class="buf__addr"
-                                                        >0x5792…bd50</span
-                                                    >
-                                                    <div class="cells">
-                                                        <div
-                                                            class="cell"
-                                                            id="rd-cell0"
-                                                        >
-                                                            10<small>[0]</small>
-                                                        </div>
-                                                        <div class="cell">
-                                                            20<small>[1]</small>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <aside class="leaves-out">
-                                <h4>What this picture leaves out</h4>
-                                <ul>
-                                    <li>
-                                        The <code>Vec</code>'s own arrow from
-                                        <code>ptr</code> to the buffer, to keep
-                                        the two reference arrows readable.
-                                    </li>
-                                    <li>
-                                        Where the references themselves are
-                                        stored. Here they were printed, so they
-                                        existed; often a reference lives only in
-                                        a register.
-                                    </li>
-                                    <li>
-                                        References to slices and to
-                                        <code>str</code>, which carry a length
-                                        as well as an address (16 bytes).
-                                    </li>
-                                </ul>
-                            </aside>
-                        </div>
-                    </figure>
-                    <p>
-                        <code>&amp;scores</code> points at the 24-byte handle,
-                        wherever <code>scores</code> is stored.
-                        <code>&amp;scores[0]</code> points into the heap buffer.
-                        That difference is why the second kind is affected when
-                        the
-                        <a href="10-string-and-vec-memory.html">buffer moves</a
-                        >. <code>examples/refs.rs</code> printed both addresses
-                        and the sizes. <code>&amp;Vec&lt;i32&gt;</code> is 8
-                        bytes, while <code>&amp;[i32]</code> and
-                        <code>&amp;str</code> are 16. A reference to a slice is
-                        bigger because it also records how many elements it
-                        covers.
-                    </p>
+<figure class="fig" data-fig="wires" data-label="reference diagram">
+  <div class="fig__head">
+    <p class="fig__title">Two references, two different targets</p>
+    <span class="fig__kind">Addresses from one run of refs.rs · shortened</span>
+  </div>
+  <div class="fig__grid fig__grid--note">
+    <div class="fig__body">
+      <div class="refdraw">
+        <div class="refdraw__refs">
+          <div class="rd-r1">
+            <span class="refbox" data-wire-to="rd-handle" data-wire-cls="ref" data-wire-side="right>left" data-wire-side-sm="top>bottom">r1: &amp;Vec&lt;i32&gt; = 0x7fff…9d08</span>
+            <small>8 bytes: one address</small>
+          </div>
+          <div class="rd-r2">
+            <span class="refbox" data-wire-to="rd-cell0" data-wire-cls="ref" data-wire-side="bottom>top" data-wire-side-sm="bottom>top">&amp;scores[0]: &amp;i32 = 0x5792…bd50</span>
+            <small>8 bytes: the address of one element</small>
+          </div>
+        </div>
+        <div class="refdraw__mem">
+          <div class="rd-handle">
+            <div class="handle-row">
+              <div class="handle" id="rd-handle"><div><small>ptr</small><b>…bd50</b></div><div><small>len</small><b>2</b></div><div><small>cap</small><b>2</b></div></div>
+              <span class="name">scores</span>
+            </div>
+            <p class="note-sm" style="margin-top:0.3rem">the <code>Vec</code> handle, at <code>0x7fff…9d08</code> in <code>main</code>'s frame</p>
+          </div>
+          <div class="heap-zone rd-heap">
+            <div class="heap-zone__h">Heap</div>
+            <div class="bufs"><div class="buf"><span class="buf__addr">0x5792…bd50</span>
+              <div class="cells"><div class="cell" id="rd-cell0">10<small>[0]</small></div><div class="cell">20<small>[1]</small></div></div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <aside class="leaves-out">
+      <h4>What this picture leaves out</h4>
+      <ul>
+        <li>The <code>Vec</code>'s own arrow from <code>ptr</code> to the buffer, to keep the two reference arrows readable.</li>
+        <li>Where the references themselves are stored. Here they were printed, so they existed; often a reference lives only in a register.</li>
+        <li>References to slices and to <code>str</code>, which carry a length as well as an address (16 bytes).</li>
+      </ul>
+    </aside>
+  </div>
+</figure>
+<p>
+  <code>&amp;scores</code> points at the 24-byte handle, wherever <code>scores</code> is stored. <code>&amp;scores[0]</code> points into the heap buffer. That difference is why the second kind is affected when the <a href="10-string-and-vec-memory.html">buffer moves</a>. <code>examples/refs.rs</code> printed both addresses and the sizes. <code>&amp;Vec&lt;i32&gt;</code> is 8 bytes, while <code>&amp;[i32]</code> and <code>&amp;str</code> are 16. A reference to a slice is bigger because it also records how many elements it covers.
+</p>
 
-                    <h2 id="the-two-rules">The two rules</h2>
-                    <p>
-                        From the Book
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html#the-rules-of-references"
-                            >The Book §4.2</a
-                        >:
-                    </p>
-                    <ul>
-                        <li>
-                            "At any given time, you can have either one mutable
-                            reference or any number of immutable references."
-                        </li>
-                        <li>"References must always be valid."</li>
-                    </ul>
-                    <p>
-                        <code>&amp;T</code> is a shared (immutable) reference:
-                        many can exist together, and none of them can change the
-                        value. <code>&amp;mut T</code> is a mutable reference:
-                        while it exists, it is the only way to reach the value.
-                        The first rule means data is never changed while someone
-                        else is reading it, which also rules out
-                        <a
-                            href="https://en.wikipedia.org/wiki/Race_condition#Data_race"
-                            class="ext"
-                            >data races</a
-                        >
-                        between
-                        <a href="06-threads-and-their-stacks.html">threads</a>.
-                        The second means a reference never outlives what it
-                        points to.
-                    </p>
+<h2 id="the-two-rules">The two rules</h2>
+<p>From the Book <a class="src" href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html#the-rules-of-references">The Book §4.2</a>:</p>
+<ul>
+  <li>"At any given time, you can have either one mutable reference or any number of immutable references."</li>
+  <li>"References must always be valid."</li>
+</ul>
+<p>
+  <code>&amp;T</code> is a shared (immutable) reference: many can exist together, and none of them can change the value. <code>&amp;mut T</code> is a mutable reference: while it exists, it is the only way to reach the value. The first rule means data is never changed while someone else is reading it, which also rules out <a href="https://en.wikipedia.org/wiki/Race_condition#Data_race" class="ext">data races</a> between <a href="06-threads-and-their-stacks.html">threads</a>. The second means a reference never outlives what it points to.
+</p>
 
-                    <h2 id="how-long-a-borrow-lasts">
-                        How long a borrow lasts
-                    </h2>
-                    <p>
-                        A borrow does not last until the end of the block. The
-                        Book: a reference's scope "starts from where it is
-                        introduced and continues through the last time that
-                        reference is used"
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html#mutable-references"
-                            >The Book §4.2</a
-                        >. The compiler checks each pair of borrows whose ranges
-                        overlap.
-                    </p>
+<h2 id="how-long-a-borrow-lasts">How long a borrow lasts</h2>
+<p>
+  A borrow does not last until the end of the block. The Book: a reference's scope "starts from where it is introduced and continues through the last time that reference is used" <a class="src" href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html#mutable-references">The Book §4.2</a>. The compiler checks each pair of borrows whose ranges overlap.
+</p>
 
-                    <figure
-                        class="fig"
-                        data-fig="pick"
-                        data-label="borrow timeline"
-                    >
-                        <div class="fig__head">
-                            <p class="fig__title">
-                                Borrow ranges, line by line
-                            </p>
-                            <span class="fig__kind"
-                                >Compiler's view · both programs in
-                                examples/</span
-                            >
-                        </div>
-                        <div class="controls">
-                            <span class="controls__label">Program</span>
-                            <div class="seg" data-choice="pick">
-                                <button
-                                    class="btn"
-                                    type="button"
-                                    data-value="ok"
-                                    aria-pressed="true"
-                                >
-                                    compiles
-                                </button>
-                                <button
-                                    class="btn"
-                                    type="button"
-                                    data-value="bad"
-                                >
-                                    rejected: overlap
-                                </button>
-                                <button
-                                    class="btn"
-                                    type="button"
-                                    data-value="out"
-                                >
-                                    rejected: outlives owner
-                                </button>
-                            </div>
-                        </div>
-                        <div class="fig__grid fig__grid--note">
-                            <div class="fig__body">
-                                <div data-pick="ok">
-                                    <p class="pick__h">
-                                        Compiles: <code>examples/refs.rs</code>
-                                    </p>
-                                    <div class="timeline">
-                                        <div
-                                            class="tl-row tl-h"
-                                            style="--cols: 3"
-                                        >
-                                            <div></div>
-                                            <div>code</div>
-                                            <div>r1</div>
-                                            <div>r2</div>
-                                            <div>m</div>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 3">
-                                            <span class="lnno">1</span
-                                            ><span class="code"
-                                                ><span class="k">let mut</span>
-                                                scores = vec![10, 20];</span
-                                            ><span class="bar"></span
-                                            ><span class="bar"></span
-                                            ><span class="bar"></span>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 3">
-                                            <span class="lnno">2</span
-                                            ><span class="code"
-                                                ><span class="k">let</span> r1 =
-                                                &amp;scores;</span
-                                            ><span class="bar on start"></span
-                                            ><span class="bar"></span
-                                            ><span class="bar"></span>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 3">
-                                            <span class="lnno">3</span
-                                            ><span class="code"
-                                                ><span class="k">let</span> r2 =
-                                                &amp;scores;</span
-                                            ><span class="bar on"></span
-                                            ><span class="bar on start"></span
-                                            ><span class="bar"></span>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 3">
-                                            <span class="lnno">4</span
-                                            ><span class="code"
-                                                >println!(<span class="k"
-                                                    >"{}"</span
-                                                >, r1[0] + r2[1]);</span
-                                            ><span class="bar on end"></span
-                                            ><span class="bar on end"></span
-                                            ><span class="bar"></span>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 3">
-                                            <span class="lnno">5</span
-                                            ><span class="code"
-                                                ><span class="k">let</span> m =
-                                                &amp;<span class="k">mut</span>
-                                                scores;</span
-                                            ><span class="bar"></span
-                                            ><span class="bar"></span
-                                            ><span
-                                                class="bar on mut start"
-                                            ></span>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 3">
-                                            <span class="lnno">6</span
-                                            ><span class="code"
-                                                >m.push(30);</span
-                                            ><span class="bar"></span
-                                            ><span class="bar"></span
-                                            ><span
-                                                class="bar on mut end"
-                                            ></span>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 3">
-                                            <span class="lnno">7</span
-                                            ><span class="code"
-                                                >println!(<span class="k"
-                                                    >"{:?}"</span
-                                                >, scores);</span
-                                            ><span class="bar"></span
-                                            ><span class="bar"></span
-                                            ><span class="bar"></span>
-                                        </div>
-                                    </div>
-                                    <p
-                                        class="note-sm"
-                                        style="margin-top: 0.6rem"
-                                    >
-                                        Two shared borrows overlap on lines 3–4,
-                                        which the rules allow. Their last use is
-                                        line 4, so the mutable borrow on line 5
-                                        overlaps nothing.
-                                    </p>
-                                </div>
-                                <div data-pick="bad">
-                                    <p class="pick__h">
-                                        Rejected:
-                                        <code>examples/borrowmut.rs</code>
-                                    </p>
-                                    <div class="timeline">
-                                        <div
-                                            class="tl-row tl-h"
-                                            style="--cols: 2"
-                                        >
-                                            <div></div>
-                                            <div>code</div>
-                                            <div>first</div>
-                                            <div>push</div>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 2">
-                                            <span class="lnno">1</span
-                                            ><span class="code"
-                                                ><span class="k">let mut</span>
-                                                scores = vec![10, 20];</span
-                                            ><span class="bar"></span
-                                            ><span class="bar"></span>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 2">
-                                            <span class="lnno">2</span
-                                            ><span class="code"
-                                                ><span class="k">let</span>
-                                                first = &amp;scores[0];</span
-                                            ><span class="bar on start"></span
-                                            ><span class="bar"></span>
-                                        </div>
-                                        <div
-                                            class="tl-row is-bad"
-                                            style="--cols: 2"
-                                        >
-                                            <span class="lnno">3</span
-                                            ><span class="code"
-                                                >scores.push(30);
-                                                <span class="e"
-                                                    >← &amp;mut while first is
-                                                    live</span
-                                                ></span
-                                            ><span class="bar on"></span
-                                            ><span
-                                                class="bar on mut bad start end"
-                                            ></span>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 2">
-                                            <span class="lnno">4</span
-                                            ><span class="code"
-                                                >println!(<span class="k"
-                                                    >"{first}"</span
-                                                >);</span
-                                            ><span class="bar on end"></span
-                                            ><span class="bar"></span>
-                                        </div>
-                                    </div>
-                                    <pre
-                                        class="out"
-                                        style="margin-top: 0.8rem"
-                                    ><code>error[E0502]: cannot borrow `scores` as mutable because it is also borrowed as immutable</code></pre>
-                                    <p class="note-sm">
-                                        Delete line 4 and <code>first</code>'s
-                                        range ends at line 2; the program then
-                                        compiles.
-                                    </p>
-                                </div>
-                                <div data-pick="out">
-                                    <p class="pick__h">
-                                        Rejected:
-                                        <code>examples/outlives.rs</code>
-                                    </p>
-                                    <div class="timeline">
-                                        <div
-                                            class="tl-row tl-h"
-                                            style="--cols: 2"
-                                        >
-                                            <div></div>
-                                            <div>code</div>
-                                            <div>x</div>
-                                            <div>r</div>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 2">
-                                            <span class="lnno">1</span
-                                            ><span class="code"
-                                                ><span class="k">let</span>
-                                                r;</span
-                                            ><span class="bar"></span
-                                            ><span class="bar"></span>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 2">
-                                            <span class="lnno">2</span
-                                            ><span class="code">{</span
-                                            ><span class="bar"></span
-                                            ><span class="bar"></span>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 2">
-                                            <span class="lnno">3</span
-                                            ><span class="code">
-                                                <span class="k">let</span> x =
-                                                5;</span
-                                            ><span
-                                                class="bar on own start"
-                                            ></span
-                                            ><span class="bar"></span>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 2">
-                                            <span class="lnno">4</span
-                                            ><span class="code">
-                                                r = &amp;x;</span
-                                            ><span class="bar on own"></span
-                                            ><span class="bar on start"></span>
-                                        </div>
-                                        <div
-                                            class="tl-row is-bad"
-                                            style="--cols: 2"
-                                        >
-                                            <span class="lnno">5</span
-                                            ><span class="code"
-                                                >}
-                                                <span class="e"
-                                                    >← x dropped while r is
-                                                    live</span
-                                                ></span
-                                            ><span class="bar on own end"></span
-                                            ><span class="bar on bad"></span>
-                                        </div>
-                                        <div class="tl-row" style="--cols: 2">
-                                            <span class="lnno">6</span
-                                            ><span class="code"
-                                                >println!(<span class="k"
-                                                    >"r: {r}"</span
-                                                >);</span
-                                            ><span class="bar"></span
-                                            ><span
-                                                class="bar on bad end"
-                                            ></span>
-                                        </div>
-                                    </div>
-                                    <pre
-                                        class="out"
-                                        style="margin-top: 0.8rem"
-                                    ><code>error[E0597]: `x` does not live long enough</code></pre>
-                                    <p class="note-sm">
-                                        The owner's range (x) ends at line 5,
-                                        but the borrow (r) is used on line 6. A
-                                        reference must not outlive the value it
-                                        refers to.
-                                    </p>
-                                </div>
-                                <div class="tl-key">
-                                    <span
-                                        ><i class="own"></i>owner in scope</span
-                                    ><span
-                                        ><i></i>shared borrow
-                                        <code>&amp;</code></span
-                                    ><span
-                                        ><i class="mut"></i>mutable borrow
-                                        <code>&amp;mut</code></span
-                                    ><span
-                                        ><i class="bad"></i>conflicting
-                                        borrow</span
-                                    >
-                                </div>
-                            </div>
-                            <aside class="leaves-out">
-                                <h4>What this picture leaves out</h4>
-                                <ul>
-                                    <li>
-                                        The short borrows that method calls and
-                                        <code>println!</code> make by
-                                        themselves, such as the
-                                        <code>&amp;scores</code> on line 7.
-                                    </li>
-                                    <li>
-                                        How the compiler computes these ranges.
-                                        It works on a control-flow graph, so
-                                        loops and branches are handled too; a
-                                        straight list of lines is the simple
-                                        case.
-                                    </li>
-                                    <li>
-                                        Nothing here exists at run time. The
-                                        ranges are a compile-time analysis; the
-                                        machine code has no record of them.
-                                    </li>
-                                </ul>
-                            </aside>
-                        </div>
-                    </figure>
+<figure class="fig" data-fig="pick" data-label="borrow timeline">
+  <div class="fig__head">
+    <p class="fig__title">Borrow ranges, line by line</p>
+    <span class="fig__kind">Compiler's view · both programs in examples/</span>
+  </div>
+  <div class="controls">
+    <span class="controls__label">Program</span>
+    <div class="seg" data-choice="pick">
+      <button class="btn" type="button" data-value="ok" aria-pressed="true">compiles</button>
+      <button class="btn" type="button" data-value="bad">rejected: overlap</button>
+      <button class="btn" type="button" data-value="out">rejected: outlives owner</button>
+    </div>
+  </div>
+  <div class="fig__grid fig__grid--note">
+    <div class="fig__body">
+      <div data-pick="ok">
+        <p class="pick__h">Compiles: <code>examples/refs.rs</code></p>
+        <div class="timeline">
+          <div class="tl-row tl-h" style="--cols:3"><div></div><div>code</div><div>r1</div><div>r2</div><div>m</div></div>
+          <div class="tl-row" style="--cols:3"><span class="lnno">1</span><span class="code"><span class="k">let mut</span> scores = vec![10, 20];</span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>
+          <div class="tl-row" style="--cols:3"><span class="lnno">2</span><span class="code"><span class="k">let</span> r1 = &amp;scores;</span><span class="bar on start"></span><span class="bar"></span><span class="bar"></span></div>
+          <div class="tl-row" style="--cols:3"><span class="lnno">3</span><span class="code"><span class="k">let</span> r2 = &amp;scores;</span><span class="bar on"></span><span class="bar on start"></span><span class="bar"></span></div>
+          <div class="tl-row" style="--cols:3"><span class="lnno">4</span><span class="code">println!(<span class="k">"{}"</span>, r1[0] + r2[1]);</span><span class="bar on end"></span><span class="bar on end"></span><span class="bar"></span></div>
+          <div class="tl-row" style="--cols:3"><span class="lnno">5</span><span class="code"><span class="k">let</span> m = &amp;<span class="k">mut</span> scores;</span><span class="bar"></span><span class="bar"></span><span class="bar on mut start"></span></div>
+          <div class="tl-row" style="--cols:3"><span class="lnno">6</span><span class="code">m.push(30);</span><span class="bar"></span><span class="bar"></span><span class="bar on mut end"></span></div>
+          <div class="tl-row" style="--cols:3"><span class="lnno">7</span><span class="code">println!(<span class="k">"{:?}"</span>, scores);</span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>
+        </div>
+        <p class="note-sm" style="margin-top:0.6rem">Two shared borrows overlap on lines 3–4, which the rules allow. Their last use is line 4, so the mutable borrow on line 5 overlaps nothing.</p>
+      </div>
+      <div data-pick="bad">
+        <p class="pick__h">Rejected: <code>examples/borrowmut.rs</code></p>
+        <div class="timeline">
+          <div class="tl-row tl-h" style="--cols:2"><div></div><div>code</div><div>first</div><div>push</div></div>
+          <div class="tl-row" style="--cols:2"><span class="lnno">1</span><span class="code"><span class="k">let mut</span> scores = vec![10, 20];</span><span class="bar"></span><span class="bar"></span></div>
+          <div class="tl-row" style="--cols:2"><span class="lnno">2</span><span class="code"><span class="k">let</span> first = &amp;scores[0];</span><span class="bar on start"></span><span class="bar"></span></div>
+          <div class="tl-row is-bad" style="--cols:2"><span class="lnno">3</span><span class="code">scores.push(30);  <span class="e">← &amp;mut while first is live</span></span><span class="bar on"></span><span class="bar on mut bad start end"></span></div>
+          <div class="tl-row" style="--cols:2"><span class="lnno">4</span><span class="code">println!(<span class="k">"{first}"</span>);</span><span class="bar on end"></span><span class="bar"></span></div>
+        </div>
+<pre class="out" style="margin-top:0.8rem"><code>error[E0502]: cannot borrow `scores` as mutable because it is also borrowed as immutable</code></pre>
+        <p class="note-sm">Delete line 4 and <code>first</code>'s range ends at line 2; the program then compiles.</p>
+      </div>
+      <div data-pick="out">
+        <p class="pick__h">Rejected: <code>examples/outlives.rs</code></p>
+        <div class="timeline">
+          <div class="tl-row tl-h" style="--cols:2"><div></div><div>code</div><div>x</div><div>r</div></div>
+          <div class="tl-row" style="--cols:2"><span class="lnno">1</span><span class="code"><span class="k">let</span> r;</span><span class="bar"></span><span class="bar"></span></div>
+          <div class="tl-row" style="--cols:2"><span class="lnno">2</span><span class="code">{</span><span class="bar"></span><span class="bar"></span></div>
+          <div class="tl-row" style="--cols:2"><span class="lnno">3</span><span class="code">    <span class="k">let</span> x = 5;</span><span class="bar on own start"></span><span class="bar"></span></div>
+          <div class="tl-row" style="--cols:2"><span class="lnno">4</span><span class="code">    r = &amp;x;</span><span class="bar on own"></span><span class="bar on start"></span></div>
+          <div class="tl-row is-bad" style="--cols:2"><span class="lnno">5</span><span class="code">}  <span class="e">← x dropped while r is live</span></span><span class="bar on own end"></span><span class="bar on bad"></span></div>
+          <div class="tl-row" style="--cols:2"><span class="lnno">6</span><span class="code">println!(<span class="k">"r: {r}"</span>);</span><span class="bar"></span><span class="bar on bad end"></span></div>
+        </div>
+<pre class="out" style="margin-top:0.8rem"><code>error[E0597]: `x` does not live long enough</code></pre>
+        <p class="note-sm">The owner's range (x) ends at line 5, but the borrow (r) is used on line 6. A reference must not outlive the value it refers to.</p>
+      </div>
+      <div class="tl-key"><span><i class="own"></i>owner in scope</span><span><i></i>shared borrow <code>&amp;</code></span><span><i class="mut"></i>mutable borrow <code>&amp;mut</code></span><span><i class="bad"></i>conflicting borrow</span></div>
+    </div>
+    <aside class="leaves-out">
+      <h4>What this picture leaves out</h4>
+      <ul>
+        <li>The short borrows that method calls and <code>println!</code> make by themselves, such as the <code>&amp;scores</code> on line 7.</li>
+        <li>How the compiler computes these ranges. It works on a control-flow graph, so loops and branches are handled too; a straight list of lines is the simple case.</li>
+        <li>Nothing here exists at run time. The ranges are a compile-time analysis; the machine code has no record of them.</li>
+      </ul>
+    </aside>
+  </div>
+</figure>
 
-                    <h2 id="lifetimes-what-a-reference-may-outlive">
-                        Lifetimes: what a reference may outlive
-                    </h2>
-                    <p>
-                        The second rule, "references must always be valid," is
-                        checked with <span class="term">lifetimes</span>: the
-                        compiler's name for the stretch of code in which a
-                        reference must stay usable. If a value is dropped while
-                        a reference to it is still going to be used, the program
-                        is rejected:
-                    </p>
-                    <div class="codeblock codeblock--bad">
-                        <div class="codeblock__label">
-                            <span><code>examples/outlives.rs</code></span
-                            ><span class="verdict">does not compile</span>
-                        </div>
-                        <pre><code><span class="k">let</span> r;
+<h2 id="lifetimes-what-a-reference-may-outlive">Lifetimes: what a reference may outlive</h2>
+<p>
+  The second rule, "references must always be valid," is checked with <span class="term">lifetimes</span>: the compiler's name for the stretch of code in which a reference must stay usable. If a value is dropped while a reference to it is still going to be used, the program is rejected:
+</p>
+<div class="codeblock codeblock--bad">
+  <div class="codeblock__label"><span><code>examples/outlives.rs</code></span><span class="verdict">does not compile</span></div>
+<pre><code><span class="k">let</span> r;
 {
     <span class="k">let</span> x = 5;
     r = &amp;x;
 }                      <span class="c">// x dropped here</span>
 println!(<span class="k">"r: {r}"</span>);   <span class="c">// r still used</span></code></pre>
-                        <pre
-                            class="out"
-                        ><code>error[E0597]: `x` does not live long enough
+<pre class="out"><code>error[E0597]: `x` does not live long enough
   |
 5 |         let x = 5;
   |             - binding `x` declared here
@@ -796,277 +218,79 @@ println!(<span class="k">"r: {r}"</span>);   <span class="c">// r still used</sp
   |     - `x` dropped here while still borrowed
 8 |     println!("r: {r}");
   |                   - borrow later used here</code></pre>
-                    </div>
-                    <p>
-                        In memory terms, <code>x</code> was in a
-                        <a href="08-function-calls-and-stack-frames.html"
-                            >frame</a
-                        >
-                        or register that is about to be reused. Returning a
-                        reference to a local fails for the same reason. The
-                        compiler reports it as a missing lifetime, because the
-                        returned reference has nothing it could borrow from:
-                    </p>
-                    <div class="codeblock codeblock--bad">
-                        <div class="codeblock__label">
-                            <span><code>examples/dangle.rs</code></span
-                            ><span class="verdict">does not compile</span>
-                        </div>
-                        <pre><code><span class="k">fn</span> dangle() -&gt; &amp;String {
+</div>
+<p>
+  In memory terms, <code>x</code> was in a <a href="08-function-calls-and-stack-frames.html">frame</a> or register that is about to be reused. Returning a reference to a local fails for the same reason. The compiler reports it as a missing lifetime, because the returned reference has nothing it could borrow from:
+</p>
+<div class="codeblock codeblock--bad">
+  <div class="codeblock__label"><span><code>examples/dangle.rs</code></span><span class="verdict">does not compile</span></div>
+<pre><code><span class="k">fn</span> dangle() -&gt; &amp;String {
     <span class="k">let</span> s = String::from(<span class="k">"hi"</span>);
     &amp;s                 <span class="c">// s is dropped when dangle returns</span>
 }</code></pre>
-                        <pre
-                            class="out"
-                        ><code>error[E0106]: missing lifetime specifier
+<pre class="out"><code>error[E0106]: missing lifetime specifier
   |
 2 | fn dangle() -&gt; &amp;String {
   |                ^ expected named lifetime parameter
   |
   = help: this function's return type contains a borrowed value, but there is no value for it to be borrowed from</code></pre>
-                    </div>
-                    <p>
-                        A lifetime annotation such as <code>'a</code> in
-                        <code
-                            >fn first&lt;'a&gt;(v: &amp;'a Vec&lt;i32&gt;) -&gt;
-                            &amp;'a i32</code
-                        >
-                        does not keep anything alive. The Book: "Lifetime
-                        annotations don't change how long any of the references
-                        live. Rather, they describe the relationships of the
-                        lifetimes of multiple references to each other"
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html#lifetime-annotation-syntax"
-                            >The Book §10.3</a
-                        >. That signature says "the returned reference is valid
-                        for as long as the argument is", so callers can be
-                        checked without looking inside the function.
-                    </p>
+</div>
+<p>
+  A lifetime annotation such as <code>'a</code> in <code>fn first&lt;'a&gt;(v: &amp;'a Vec&lt;i32&gt;) -&gt; &amp;'a i32</code> does not keep anything alive. The Book: "Lifetime annotations don't change how long any of the references live. Rather, they describe the relationships of the lifetimes of multiple references to each other" <a class="src" href="https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html#lifetime-annotation-syntax">The Book §10.3</a>. That signature says "the returned reference is valid for as long as the argument is", so callers can be checked without looking inside the function.
+</p>
 
-                    <h2 id="where-checking-stops-unsafe">
-                        Where checking stops: <code>unsafe</code>
-                    </h2>
-                    <p>
-                        Everything above applies to safe Rust. Rust also has raw
-                        pointers, <code>*const T</code> and <code>*mut T</code>,
-                        which carry no lifetime and no borrow rules. Creating
-                        one is safe; reading or writing through one needs an
-                        <code>unsafe</code> block.
-                    </p>
-                    <p>
-                        Inside it, the compiler trusts you instead of checking.
-                        The Reference: "<code>unsafe</code> only means that
-                        avoiding undefined behavior is on the programmer"
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/reference/behavior-considered-undefined.html"
-                            >Reference: undefined behavior</a
-                        >. Libraries such as <code>Vec</code> use
-                        <code>unsafe</code> code internally and expose a safe
-                        interface whose rules make misuse impossible from safe
-                        code
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/nomicon/safe-unsafe-meaning.html"
-                            >Rustonomicon: how safe and unsafe interact</a
-                        >.
-                    </p>
+<h2 id="where-checking-stops-unsafe">Where checking stops: <code>unsafe</code></h2>
+<p>
+  Everything above applies to safe Rust. Rust also has raw pointers, <code>*const T</code> and <code>*mut T</code>, which carry no lifetime and no borrow rules. Creating one is safe; reading or writing through one needs an <code>unsafe</code> block.
+</p>
+<p>
+  Inside it, the compiler trusts you instead of checking. The Reference: "<code>unsafe</code> only means that avoiding undefined behavior is on the programmer" <a class="src" href="https://doc.rust-lang.org/reference/behavior-considered-undefined.html">Reference: undefined behavior</a>. Libraries such as <code>Vec</code> use <code>unsafe</code> code internally and expose a safe interface whose rules make misuse impossible from safe code <a class="src" href="https://doc.rust-lang.org/nomicon/safe-unsafe-meaning.html">Rustonomicon: how safe and unsafe interact</a>.
+</p>
 
-                    <div class="aside aside--wrong">
-                        <p class="aside__h">
-                            Four tempting pictures that are wrong
-                        </p>
-                        <p>
-                            "A reference is a copy of the value." It holds an
-                            address. Reading through it reads the original.
-                        </p>
-                        <p>
-                            "A lifetime annotation makes a value live longer."
-                            It describes a relationship the compiler then
-                            checks. It changes no drop.
-                        </p>
-                        <p>
-                            "Lifetimes are timers that run while the program
-                            runs." They exist only during compilation.
-                        </p>
-                        <p>
-                            "Rust prevents every memory bug." It prevents
-                            dangling references and data races in safe code.
-                            <code>unsafe</code> code, leaks and logic errors are
-                            still possible; see
-                            <a href="14-memory-bugs-and-rust-safety.html"
-                                >memory bugs and Rust's safety</a
-                            >.
-                        </p>
-                    </div>
+<div class="aside aside--wrong">
+  <p class="aside__h">Four tempting pictures that are wrong</p>
+  <p>"A reference is a copy of the value." It holds an address. Reading through it reads the original.</p>
+  <p>"A lifetime annotation makes a value live longer." It describes a relationship the compiler then checks. It changes no drop.</p>
+  <p>"Lifetimes are timers that run while the program runs." They exist only during compilation.</p>
+  <p>"Rust prevents every memory bug." It prevents dangling references and data races in safe code. <code>unsafe</code> code, leaks and logic errors are still possible; see <a href="14-memory-bugs-and-rust-safety.html">memory bugs and Rust's safety</a>.</p>
+</div>
 
-                    <section class="keep" aria-labelledby="keep-h">
-                        <h2 id="keep-h">What to remember</h2>
-                        <ol>
-                            <li>
-                                A reference is a non-owning value that holds an
-                                address; dropping it frees nothing.
-                            </li>
-                            <li>
-                                At any point, a value has either one
-                                <code>&amp;mut</code> or any number of
-                                <code>&amp;</code>, and a borrow lasts until its
-                                last use.
-                            </li>
-                            <li>
-                                Lifetimes are a compile-time check that no
-                                reference outlives its value;
-                                <code>unsafe</code> code is where that checking
-                                becomes your job.
-                            </li>
-                        </ol>
-                    </section>
+<section class="keep" aria-labelledby="keep-h">
+  <h2 id="keep-h">What to remember</h2>
+  <ol>
+    <li>A reference is a non-owning value that holds an address; dropping it frees nothing.</li>
+    <li>At any point, a value has either one <code>&amp;mut</code> or any number of <code>&amp;</code>, and a borrow lasts until its last use.</li>
+    <li>Lifetimes are a compile-time check that no reference outlives its value; <code>unsafe</code> code is where that checking becomes your job.</li>
+  </ol>
+</section>
 
-                    <section class="test" aria-labelledby="test-h">
-                        <h2 id="test-h">Check your understanding</h2>
-                        <details>
-                            <summary>
-                                Does <code>&amp;scores</code> point to the heap
-                                buffer?
-                            </summary>
-                            <div>
-                                <p>
-                                    No. It points to the
-                                    <code>Vec</code> handle.
-                                    <code>&amp;scores[0]</code> points into the
-                                    buffer.
-                                </p>
-                            </div>
-                        </details>
-                        <details>
-                            <summary>
-                                In the compiling program above, why is
-                                <code>let m = &amp;mut scores;</code> on line 5
-                                allowed while <code>r1</code> and
-                                <code>r2</code> are still in scope?
-                            </summary>
-                            <div>
-                                <p>
-                                    Their last use is on line 4, so their
-                                    borrows have ended. Being "in scope" as
-                                    names does not matter; use does.
-                                </p>
-                            </div>
-                        </details>
-                        <details>
-                            <summary>
-                                Why can't a function return
-                                <code>&amp;s</code> for a <code>String</code> it
-                                created?
-                            </summary>
-                            <div>
-                                <p>
-                                    <code>s</code> is dropped when the function
-                                    returns, so the reference would point at
-                                    freed memory. The compiler rejects it.
-                                </p>
-                            </div>
-                        </details>
-                    </section>
+<section class="test" aria-labelledby="test-h">
+  <h2 id="test-h">Check your understanding</h2>
+  <details>
+    <summary>Does <code>&amp;scores</code> point to the heap buffer?</summary>
+    <div><p>No. It points to the <code>Vec</code> handle. <code>&amp;scores[0]</code> points into the buffer.</p></div>
+  </details>
+  <details>
+    <summary>In the compiling program above, why is <code>let m = &amp;mut scores;</code> on line 5 allowed while <code>r1</code> and <code>r2</code> are still in scope?</summary>
+    <div><p>Their last use is on line 4, so their borrows have ended. Being "in scope" as names does not matter; use does.</p></div>
+  </details>
+  <details>
+    <summary>Why can't a function return <code>&amp;s</code> for a <code>String</code> it created?</summary>
+    <div><p><code>s</code> is dropped when the function returns, so the reference would point at freed memory. The compiler rejects it.</p></div>
+  </details>
+</section>
 
-                    <p class="related">
-                        <b>Related:</b>
-                        <a href="11-ownership-moves-clone-and-drop.html"
-                            >owners and drops</a
-                        >
-                        ·
-                        <a href="10-string-and-vec-memory.html"
-                            >why the buffer can move</a
-                        >
-                        ·
-                        <a href="06-threads-and-their-stacks.html"
-                            >threads sharing <code>&amp;scores</code></a
-                        >
-                        ·
-                        <a href="13-iterators-and-following-data.html"
-                            >iteration borrows</a
-                        >
-                    </p>
+<p class="related"><b>Related:</b> <a href="11-ownership-moves-clone-and-drop.html">owners and drops</a> · <a href="10-string-and-vec-memory.html">why the buffer can move</a> · <a href="06-threads-and-their-stacks.html">threads sharing <code>&amp;scores</code></a> · <a href="13-iterators-and-following-data.html">iteration borrows</a></p>
 
-                    <p>
-                        <b>Next question:</b> a <code>for</code> loop over
-                        <code>scores</code> reads every element.
-                        <a href="13-iterators-and-following-data.html"
-                            >What does each step of the loop actually hand you:
-                            a reference, or the element itself?</a
-                        >
-                    </p>
-                    <nav class="pager" aria-label="Previous and next">
-                        <a
-                            class="pager__prev"
-                            href="11-ownership-moves-clone-and-drop.html"
-                            rel="prev"
-                            ><span class="pager__dir">← Previous</span
-                            ><span class="pager__q"
-                                >Who frees a String's memory, and what does
-                                <code>let b = a;</code> change?</span
-                            ></a
-                        >
-                        <a
-                            class="pager__next"
-                            href="13-iterators-and-following-data.html"
-                            rel="next"
-                            ><span class="pager__dir">Next →</span
-                            ><span class="pager__q"
-                                >What does a loop over a Vec actually hand
-                                you?</span
-                            ></a
-                        >
-                    </nav>
-                </article>
-                <footer class="foot">
-                    <p>
-                        Observed values, such as addresses, sizes, assembly and
-                        program output, come from one machine. It runs Linux 7.0
-                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
-                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
-                        limit. Addresses change on every run, and other systems,
-                        toolchains and allocators can differ. Details:
-                        <a href="../reference/sources.html">Sources</a> ·
-                        <code>examples/OUTPUT.txt</code>.
-                    </p>
-                </footer>
-            </main>
-            <nav class="otp" aria-label="On this page">
-                <p class="otp__h">On this page</p>
-                <ol class="otp__list">
-                    <li class="lv2">
-                        <a
-                            href="#a-reference-is-a-small-value-that-holds-an-address"
-                            >A reference is a small value that holds an
-                            address</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a href="#the-two-rules">The two rules</a>
-                    </li>
-                    <li class="lv2">
-                        <a href="#how-long-a-borrow-lasts"
-                            >How long a borrow lasts</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a href="#lifetimes-what-a-reference-may-outlive"
-                            >Lifetimes: what a reference may outlive</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a href="#where-checking-stops-unsafe"
-                            >Where checking stops: unsafe</a
-                        >
-                    </li>
-                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
-                    <li class="lv2">
-                        <a href="#test-h">Check your understanding</a>
-                    </li>
-                </ol>
-            </nav>
-        </div>
-    </body>
+<p><b>Next question:</b> a <code>for</code> loop over <code>scores</code> reads every element. <a href="13-iterators-and-following-data.html">What does each step of the loop actually hand you: a reference, or the element itself?</a></p>
+<nav class="pager" aria-label="Previous and next">
+<a class="pager__prev" href="11-ownership-moves-clone-and-drop.html" rel="prev"><span class="pager__dir">← Previous</span><span class="pager__q">Who frees a String's memory, and what does <code>let b = a;</code> change?</span></a>
+<a class="pager__next" href="13-iterators-and-following-data.html" rel="next"><span class="pager__dir">Next →</span><span class="pager__q">What does a loop over a Vec actually hand you?</span></a>
+</nav>
+</article>
+<footer class="foot"><p>Observed values, such as addresses, sizes, assembly and program output, come from one machine. It runs Linux 7.0 (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack limit. Addresses change on every run, and other systems, toolchains and allocators can differ. Details: <a href="../reference/sources.html">Sources</a> · <code>examples/OUTPUT.txt</code>.</p></footer>
+</main>
+<nav class="otp" aria-label="On this page"><p class="otp__h">On this page</p><ol class="otp__list"><li class="lv2"><a href="#a-reference-is-a-small-value-that-holds-an-address">A reference is a small value that holds an address</a></li><li class="lv2"><a href="#the-two-rules">The two rules</a></li><li class="lv2"><a href="#how-long-a-borrow-lasts">How long a borrow lasts</a></li><li class="lv2"><a href="#lifetimes-what-a-reference-may-outlive">Lifetimes: what a reference may outlive</a></li><li class="lv2"><a href="#where-checking-stops-unsafe">Where checking stops: unsafe</a></li><li class="lv2"><a href="#keep-h">What to remember</a></li><li class="lv2"><a href="#test-h">Check your understanding</a></li></ol></nav>
+</div>
+</body>
 </html>

@@ -1,0 +1,3 @@
+# The HTML is generated with exact whitespace: code boxes and timeline rows
+# use white-space: pre, and reformatting them breaks the figures.
+*.html

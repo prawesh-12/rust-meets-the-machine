@@ -1,743 +1,169 @@
 <!doctype html>
 <html lang="en" class="no-js">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>How a Rust program meets the machine</title>
-        <meta
-            name="description"
-            content="Fifteen connected pages that follow one small Rust program from a text file, through the compiler, the operating system, virtual memory, the CPU and its caches, to stack frames, heap allocations, ownership and borrowing."
-        />
-        <link rel="stylesheet" href="assets/css/site.css" />
-        <script src="assets/js/site.js"></script>
-        <script src="assets/js/diagrams.js" defer></script>
-    </head>
-    <body>
-        <a class="skip" href="#main">Skip to the text</a>
-        <header class="top">
-            <a class="top__title" href="index.html"
-                >How a Rust program meets the machine</a
-            >
-            <span class="top__here">The whole map</span>
-            <span class="top__spacer"></span>
-            <button
-                class="top__btn"
-                type="button"
-                data-toc-toggle
-                aria-expanded="false"
-                aria-controls="toc"
-            >
-                Contents
-            </button>
-        </header>
-        <div class="shell">
-            <nav class="toc" id="toc" aria-label="Contents">
-                <a class="toc__home" href="index.html" aria-current="page"
-                    >The whole map</a
-                >
-                <p class="toc__group">Before your code runs</p>
-                <ol>
-                    <li>
-                        <a href="lessons/01-what-is-a-program.html"
-                            ><span class="n">01</span
-                            ><span>What a program is</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="lessons/02-how-a-cpu-runs-code.html"
-                            ><span class="n">02</span
-                            ><span>How a CPU runs code</span></a
-                        >
-                    </li>
-                    <li>
-                        <a
-                            href="lessons/03-programs-processes-and-the-kernel.html"
-                            ><span class="n">03</span
-                            ><span>Processes and the kernel</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Addresses</p>
-                <ol>
-                    <li>
-                        <a href="lessons/04-virtual-memory.html"
-                            ><span class="n">04</span
-                            ><span>Inside an address space</span></a
-                        >
-                    </li>
-                    <li>
-                        <a
-                            href="lessons/05-physical-ram-and-address-translation.html"
-                            ><span class="n">05</span
-                            ><span>From virtual address to RAM</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="lessons/06-threads-and-their-stacks.html"
-                            ><span class="n">06</span
-                            ><span>Threads and their stacks</span></a
-                        >
-                    </li>
-                    <li>
-                        <a
-                            href="lessons/07-registers-caches-and-a-memory-read.html"
-                            ><span class="n">07</span
-                            ><span>Caches and one load</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Calls and data</p>
-                <ol>
-                    <li>
-                        <a
-                            href="lessons/08-function-calls-and-stack-frames.html"
-                            ><span class="n">08</span
-                            ><span>Calls and stack frames</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="lessons/09-rust-values-stack-heap-and-box.html"
-                            ><span class="n">09</span
-                            ><span>Values, stack, heap, Box</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="lessons/10-string-and-vec-memory.html"
-                            ><span class="n">10</span
-                            ><span>String and Vec</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Rust's rules</p>
-                <ol>
-                    <li>
-                        <a href="lessons/11-ownership-moves-clone-and-drop.html"
-                            ><span class="n">11</span
-                            ><span>Ownership, moves, drop</span></a
-                        >
-                    </li>
-                    <li>
-                        <a
-                            href="lessons/12-references-borrowing-and-lifetimes.html"
-                            ><span class="n">12</span
-                            ><span>References and lifetimes</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="lessons/13-iterators-and-following-data.html"
-                            ><span class="n">13</span><span>Iterators</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="lessons/14-memory-bugs-and-rust-safety.html"
-                            ><span class="n">14</span
-                            ><span>Memory bugs and safety</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">All together</p>
-                <ol>
-                    <li>
-                        <a href="lessons/15-follow-one-example-end-to-end.html"
-                            ><span class="n">15</span
-                            ><span>One call, every layer</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Reference</p>
-                <ul class="toc__ref">
-                    <li><a href="reference/glossary.html">Glossary</a></li>
-                    <li><a href="reference/sources.html">Sources</a></li>
-                    <li>
-                        <a href="reference/concept-map.html">Concept map</a>
-                    </li>
-                </ul>
-            </nav>
-            <main id="main">
-                <article class="page">
-                    <header class="opening">
-                        <div class="opening__meta">
-                            <span class="opening__num">Start here</span>
-                        </div>
-                        <h1>How a Rust program meets the machine</h1>
-                        <p class="why">
-                            Rust's ownership and borrowing rules make much more
-                            sense once you can picture what they protect. They
-                            protect real bytes, at real addresses, inside a
-                            process that the operating system and the CPU are
-                            running. The picture is built one layer at a time,
-                            using the same small program throughout.
-                        </p>
-                    </header>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How a Rust program meets the machine</title>
+<meta name="description" content="Fifteen connected pages that follow one small Rust program from a text file, through the compiler, the operating system, virtual memory, the CPU and its caches, to stack frames, heap allocations, ownership and borrowing.">
+<link rel="stylesheet" href="assets/css/site.css">
+<script src="assets/js/site.js"></script>
+<script src="assets/js/diagrams.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the text</a>
+<header class="top">
+  <a class="top__title" href="index.html">How a Rust program meets the machine</a>
+  <span class="top__here">The whole map</span>
+  <span class="top__spacer"></span>
+  <button class="top__btn" type="button" data-toc-toggle aria-expanded="false" aria-controls="toc">Contents</button>
+</header>
+<div class="shell">
+<nav class="toc" id="toc" aria-label="Contents">
+<a class="toc__home" href="index.html" aria-current="page">The whole map</a>
+<p class="toc__group">Before your code runs</p><ol>
+<li><a href="lessons/01-what-is-a-program.html"><span class="n">01</span><span>What a program is</span></a></li>
+<li><a href="lessons/02-how-a-cpu-runs-code.html"><span class="n">02</span><span>How a CPU runs code</span></a></li>
+<li><a href="lessons/03-programs-processes-and-the-kernel.html"><span class="n">03</span><span>Processes and the kernel</span></a></li>
+</ol>
+<p class="toc__group">Addresses</p><ol>
+<li><a href="lessons/04-virtual-memory.html"><span class="n">04</span><span>Inside an address space</span></a></li>
+<li><a href="lessons/05-physical-ram-and-address-translation.html"><span class="n">05</span><span>From virtual address to RAM</span></a></li>
+<li><a href="lessons/06-threads-and-their-stacks.html"><span class="n">06</span><span>Threads and their stacks</span></a></li>
+<li><a href="lessons/07-registers-caches-and-a-memory-read.html"><span class="n">07</span><span>Caches and one load</span></a></li>
+</ol>
+<p class="toc__group">Calls and data</p><ol>
+<li><a href="lessons/08-function-calls-and-stack-frames.html"><span class="n">08</span><span>Calls and stack frames</span></a></li>
+<li><a href="lessons/09-rust-values-stack-heap-and-box.html"><span class="n">09</span><span>Values, stack, heap, Box</span></a></li>
+<li><a href="lessons/10-string-and-vec-memory.html"><span class="n">10</span><span>String and Vec</span></a></li>
+</ol>
+<p class="toc__group">Rust's rules</p><ol>
+<li><a href="lessons/11-ownership-moves-clone-and-drop.html"><span class="n">11</span><span>Ownership, moves, drop</span></a></li>
+<li><a href="lessons/12-references-borrowing-and-lifetimes.html"><span class="n">12</span><span>References and lifetimes</span></a></li>
+<li><a href="lessons/13-iterators-and-following-data.html"><span class="n">13</span><span>Iterators</span></a></li>
+<li><a href="lessons/14-memory-bugs-and-rust-safety.html"><span class="n">14</span><span>Memory bugs and safety</span></a></li>
+</ol>
+<p class="toc__group">All together</p><ol>
+<li><a href="lessons/15-follow-one-example-end-to-end.html"><span class="n">15</span><span>One call, every layer</span></a></li>
+</ol>
+<p class="toc__group">Reference</p><ul class="toc__ref">
+<li><a href="reference/glossary.html">Glossary</a></li>
+<li><a href="reference/sources.html">Sources</a></li>
+<li><a href="reference/concept-map.html">Concept map</a></li>
+</ul>
+</nav>
+<main id="main">
+<article class="page">
+<header class="opening">
+  <div class="opening__meta"><span class="opening__num">Start here</span></div>
+  <h1>How a Rust program meets the machine</h1>
+  <p class="why">
+    Rust's ownership and borrowing rules make much more sense once you can picture what they protect. They protect real bytes, at real addresses, inside a process that the operating system and the CPU are running. The picture is built one layer at a time, using the same small program throughout.
+  </p>
+</header>
 
-                    <p>
-                        There are four layers. Every idea here belongs to one of
-                        them, and much of the confusion around "stack", "heap"
-                        and "memory" comes from mixing them up. Each layer keeps
-                        the same colour everywhere.
-                    </p>
+<p>
+  There are four layers. Every idea here belongs to one of them, and much of the confusion around "stack", "heap" and "memory" comes from mixing them up. Each layer keeps the same colour everywhere.
+</p>
 
-                    <ul
-                        class="legend"
-                        aria-label="Which layer each colour means"
-                    >
-                        <li>
-                            <span class="sw sw-rust"></span
-                            ><span
-                                ><b>Rust language</b> — rules the compiler
-                                checks before anything runs</span
-                            >
-                        </li>
-                        <li>
-                            <span class="sw sw-comp"></span
-                            ><span
-                                ><b>Compiler &amp; runtime library</b> — machine
-                                code, start-up code, the allocator</span
-                            >
-                        </li>
-                        <li>
-                            <span class="sw sw-os"></span
-                            ><span
-                                ><b>Operating system</b> — processes, threads,
-                                address spaces</span
-                            >
-                        </li>
-                        <li>
-                            <span class="sw sw-hw"></span
-                            ><span
-                                ><b>CPU &amp; hardware</b> — registers, caches,
-                                address translation, RAM</span
-                            >
-                        </li>
-                    </ul>
+<ul class="legend" aria-label="Which layer each colour means">
+  <li><span class="sw sw-rust"></span><span><b>Rust language</b> — rules the compiler checks before anything runs</span></li>
+  <li><span class="sw sw-comp"></span><span><b>Compiler &amp; runtime library</b> — machine code, start-up code, the allocator</span></li>
+  <li><span class="sw sw-os"></span><span><b>Operating system</b> — processes, threads, address spaces</span></li>
+  <li><span class="sw sw-hw"></span><span><b>CPU &amp; hardware</b> — registers, caches, address translation, RAM</span></li>
+</ul>
 
-                    <figure class="fig">
-                        <div class="fig__head">
-                            <p class="fig__title">
-                                One running Rust program, cut open
-                            </p>
-                            <span class="fig__kind"
-                                >Overview · each part links to its topic</span
-                            >
-                        </div>
-                        <div class="map">
-                            <div class="map__band map__band--rust">
-                                <div class="map__layer">
-                                    Rust language<span>checked by rustc</span>
-                                </div>
-                                <div class="map__row">
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/10-string-and-vec-memory.html"
-                                        ><span class="n">10</span
-                                        ><b
-                                            ><code
-                                                >scores: Vec&lt;i32&gt;</code
-                                            ></b
-                                        >a handle that owns a buffer
-                                        <span class="mini"
-                                            ><span>ptr</span><span>len 3</span
-                                            ><span>cap 4</span></span
-                                        ></a
-                                    >
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/11-ownership-moves-clone-and-drop.html"
-                                        ><span class="n">11</span
-                                        ><b>Ownership</b>one owner; dropped at
-                                        end of scope</a
-                                    >
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/12-references-borrowing-and-lifetimes.html"
-                                        ><span class="n">12</span
-                                        ><b><code>&amp;scores</code></b
-                                        >a borrow: use without owning</a
-                                    >
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/13-iterators-and-following-data.html"
-                                        ><span class="n">13</span
-                                        ><b
-                                            ><code
-                                                >for s in scores.iter()</code
-                                            ></b
-                                        >visit items one by one</a
-                                    >
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/14-memory-bugs-and-rust-safety.html"
-                                        ><span class="n">14</span
-                                        ><b>Safety</b>which bugs Rust rules out,
-                                        and which it does not</a
-                                    >
-                                </div>
-                            </div>
-                            <div class="map__band map__band--comp">
-                                <div class="map__layer">
-                                    Compiler &amp; runtime<span
-                                        >rustc, LLVM, std</span
-                                    >
-                                </div>
-                                <div class="map__row">
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/01-what-is-a-program.html"
-                                        ><span class="n">01</span
-                                        ><b>Executable file</b>machine code + a
-                                        loading plan</a
-                                    >
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/08-function-calls-and-stack-frames.html"
-                                        ><span class="n">08</span
-                                        ><b>Stack frames</b>how calls use a
-                                        thread's stack</a
-                                    >
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/09-rust-values-stack-heap-and-box.html"
-                                        ><span class="n">09</span
-                                        ><b>Allocator</b>hands out heap memory
-                                        for <code>Box</code>, <code>Vec</code>,
-                                        <code>String</code></a
-                                    >
-                                </div>
-                            </div>
-                            <div class="map__band map__band--os">
-                                <div class="map__layer">
-                                    Operating system<span>the kernel</span>
-                                </div>
-                                <div class="map__row">
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/03-programs-processes-and-the-kernel.html"
-                                        ><span class="n">03</span
-                                        ><b>Process</b>one running copy of the
-                                        program</a
-                                    >
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/04-virtual-memory.html"
-                                        ><span class="n">04</span
-                                        ><b>Address space</b>what the process
-                                        can address
-                                        <span class="strip"
-                                            ><span>code</span><span>data</span
-                                            ><span>heap</span
-                                            ><span class="gap"></span
-                                            ><span>libraries</span
-                                            ><span>stack: thread 2</span
-                                            ><span class="gap"></span
-                                            ><span>stack: thread 1</span></span
-                                        ></a
-                                    >
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/06-threads-and-their-stacks.html"
-                                        ><span class="n">06</span
-                                        ><b>Threads</b>each has its own stack
-                                        and registers</a
-                                    >
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/05-physical-ram-and-address-translation.html"
-                                        ><span class="n">05</span
-                                        ><b>Page tables</b>which virtual page
-                                        uses which frame of RAM</a
-                                    >
-                                </div>
-                            </div>
-                            <div class="map__band map__band--hw">
-                                <div class="map__layer">
-                                    CPU &amp; hardware<span>silicon</span>
-                                </div>
-                                <div class="map__row">
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/02-how-a-cpu-runs-code.html"
-                                        ><span class="n">02</span
-                                        ><b>Core</b>registers and execution
-                                        units run instructions</a
-                                    >
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/05-physical-ram-and-address-translation.html"
-                                        ><span class="n">05</span
-                                        ><b>MMU and TLB</b>translate every
-                                        virtual address</a
-                                    >
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/07-registers-caches-and-a-memory-read.html"
-                                        ><span class="n">07</span
-                                        ><b>Caches</b>L1, L2, L3 keep copies of
-                                        recent memory</a
-                                    >
-                                    <a
-                                        class="mapitem"
-                                        href="lessons/05-physical-ram-and-address-translation.html"
-                                        ><span class="n">05</span
-                                        ><b>RAM</b>physical memory, used in page
-                                        frames
-                                        <span class="frames"
-                                            ><i class="u"></i><i></i
-                                            ><i class="u"></i><i class="u"></i
-                                            ><i></i><i></i><i class="u"></i
-                                            ><i></i></span
-                                    ></a>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="fig__cap">
-                            Read it from the bottom up. The CPU executes
-                            instructions and the hardware translates addresses.
-                            The kernel gives each process its address space and
-                            threads. The compiler and runtime decide how calls
-                            and allocations use that space. Rust's rules sit on
-                            top and decide which code may touch which value. You
-                            do not need to remember this picture now. Each
-                            question below zooms in on one part of it.
-                        </p>
-                    </figure>
+<figure class="fig">
+  <div class="fig__head">
+    <p class="fig__title">One running Rust program, cut open</p>
+    <span class="fig__kind">Overview · each part links to its topic</span>
+  </div>
+  <div class="map">
+    <div class="map__band map__band--rust">
+      <div class="map__layer">Rust language<span>checked by rustc</span></div>
+      <div class="map__row">
+        <a class="mapitem" href="lessons/10-string-and-vec-memory.html"><span class="n">10</span><b><code>scores: Vec&lt;i32&gt;</code></b>a handle that owns a buffer
+          <span class="mini"><span>ptr</span><span>len 3</span><span>cap 4</span></span></a>
+        <a class="mapitem" href="lessons/11-ownership-moves-clone-and-drop.html"><span class="n">11</span><b>Ownership</b>one owner; dropped at end of scope</a>
+        <a class="mapitem" href="lessons/12-references-borrowing-and-lifetimes.html"><span class="n">12</span><b><code>&amp;scores</code></b>a borrow: use without owning</a>
+        <a class="mapitem" href="lessons/13-iterators-and-following-data.html"><span class="n">13</span><b><code>for s in scores.iter()</code></b>visit items one by one</a>
+        <a class="mapitem" href="lessons/14-memory-bugs-and-rust-safety.html"><span class="n">14</span><b>Safety</b>which bugs Rust rules out, and which it does not</a>
+      </div>
+    </div>
+    <div class="map__band map__band--comp">
+      <div class="map__layer">Compiler &amp; runtime<span>rustc, LLVM, std</span></div>
+      <div class="map__row">
+        <a class="mapitem" href="lessons/01-what-is-a-program.html"><span class="n">01</span><b>Executable file</b>machine code + a loading plan</a>
+        <a class="mapitem" href="lessons/08-function-calls-and-stack-frames.html"><span class="n">08</span><b>Stack frames</b>how calls use a thread's stack</a>
+        <a class="mapitem" href="lessons/09-rust-values-stack-heap-and-box.html"><span class="n">09</span><b>Allocator</b>hands out heap memory for <code>Box</code>, <code>Vec</code>, <code>String</code></a>
+      </div>
+    </div>
+    <div class="map__band map__band--os">
+      <div class="map__layer">Operating system<span>the kernel</span></div>
+      <div class="map__row">
+        <a class="mapitem" href="lessons/03-programs-processes-and-the-kernel.html"><span class="n">03</span><b>Process</b>one running copy of the program</a>
+        <a class="mapitem" href="lessons/04-virtual-memory.html"><span class="n">04</span><b>Address space</b>what the process can address
+          <span class="strip"><span>code</span><span>data</span><span>heap</span><span class="gap"></span><span>libraries</span><span>stack: thread 2</span><span class="gap"></span><span>stack: thread 1</span></span></a>
+        <a class="mapitem" href="lessons/06-threads-and-their-stacks.html"><span class="n">06</span><b>Threads</b>each has its own stack and registers</a>
+        <a class="mapitem" href="lessons/05-physical-ram-and-address-translation.html"><span class="n">05</span><b>Page tables</b>which virtual page uses which frame of RAM</a>
+      </div>
+    </div>
+    <div class="map__band map__band--hw">
+      <div class="map__layer">CPU &amp; hardware<span>silicon</span></div>
+      <div class="map__row">
+        <a class="mapitem" href="lessons/02-how-a-cpu-runs-code.html"><span class="n">02</span><b>Core</b>registers and execution units run instructions</a>
+        <a class="mapitem" href="lessons/05-physical-ram-and-address-translation.html"><span class="n">05</span><b>MMU and TLB</b>translate every virtual address</a>
+        <a class="mapitem" href="lessons/07-registers-caches-and-a-memory-read.html"><span class="n">07</span><b>Caches</b>L1, L2, L3 keep copies of recent memory</a>
+        <a class="mapitem" href="lessons/05-physical-ram-and-address-translation.html"><span class="n">05</span><b>RAM</b>physical memory, used in page frames
+          <span class="frames"><i class="u"></i><i></i><i class="u"></i><i class="u"></i><i></i><i></i><i class="u"></i><i></i></span></a>
+      </div>
+    </div>
+  </div>
+  <p class="fig__cap">
+    Read it from the bottom up. The CPU executes instructions and the hardware translates addresses. The kernel gives each process its address space and threads. The compiler and runtime decide how calls and allocations use that space. Rust's rules sit on top and decide which code may touch which value. You do not need to remember this picture now. Each question below zooms in on one part of it.
+  </p>
+</figure>
 
-                    <h2 id="the-route">The route</h2>
-                    <p>
-                        Each topic answers one question, and each answer raises
-                        the next one. Every topic can be read on its own, but
-                        they make the most sense in this order. A
-                        <span class="seen" aria-hidden="true">&#10003;</span>
-                        next to a number marks a topic you have already opened
-                        in this browser.
-                    </p>
+<h2 id="the-route">The route</h2>
+<p>
+  Each topic answers one question, and each answer raises the next one. Every topic can be read on its own, but they make the most sense in this order. A <span class="seen" aria-hidden="true">&#10003;</span> next to a number marks a topic you have already opened in this browser.
+</p>
 
-                    <ol class="contents">
-                        <li>
-                            <a href="lessons/01-what-is-a-program.html"
-                                ><span class="n">01</span
-                                ><span class="q"
-                                    >What is a program?<small
-                                        >The <b>program</b> is instructions and
-                                        data prepared for running. Text becomes
-                                        an executable file; the OS turns the
-                                        file into a running process.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-comp"
-                                        >Comp</span
-                                    ></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a href="lessons/02-how-a-cpu-runs-code.html"
-                                ><span class="n">02</span
-                                ><span class="q"
-                                    >How does a CPU run code?<small
-                                        >The <b>CPU</b> runs machine
-                                        instructions, using registers and
-                                        execution units.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-hw">HW</span></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                href="lessons/03-programs-processes-and-the-kernel.html"
-                                ><span class="n">03</span
-                                ><span class="q"
-                                    >What does a program get when it starts
-                                    running?<small
-                                        >The <b>operating system</b> starts
-                                        programs and manages resources. A
-                                        <b>process</b> is a running instance
-                                        with its own address space.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-os">OS</span></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a href="lessons/04-virtual-memory.html"
-                                ><span class="n">04</span
-                                ><span class="q"
-                                    >What is inside a process's address
-                                    space?<small
-                                        ><b>Virtual memory</b> is the address
-                                        space a process uses: code, data, heap,
-                                        libraries, stacks.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-os">OS</span></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                href="lessons/05-physical-ram-and-address-translation.html"
-                                ><span class="n">05</span
-                                ><span class="q"
-                                    >How does a virtual address reach physical
-                                    RAM?<small
-                                        ><b>Physical RAM</b> is real hardware
-                                        memory. The OS and the MMU map virtual
-                                        pages onto its frames.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-hw">HW</span
-                                    ><span class="tag tag-os">OS</span></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a href="lessons/06-threads-and-their-stacks.html"
-                                ><span class="n">06</span
-                                ><span class="q"
-                                    >What do threads share, and what does each
-                                    keep to itself?<small
-                                        >A <b>thread</b> is a path of execution
-                                        in a process, with its own execution
-                                        state and its own stack.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-os">OS</span></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                href="lessons/07-registers-caches-and-a-memory-read.html"
-                                ><span class="n">07</span
-                                ><span class="q"
-                                    >Where do the bytes of one memory read come
-                                    from?<small
-                                        ><b>Registers and caches</b> let the CPU
-                                        work without going to RAM for every
-                                        value.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-hw">HW</span></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                href="lessons/08-function-calls-and-stack-frames.html"
-                                ><span class="n">08</span
-                                ><span class="q"
-                                    >What happens on the stack when one function
-                                    calls another?<small
-                                        >The <b>stack</b> holds the active calls
-                                        of one thread, in order.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-comp"
-                                        >Comp</span
-                                    ></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                href="lessons/09-rust-values-stack-heap-and-box.html"
-                                ><span class="n">09</span
-                                ><span class="q"
-                                    >Where does a Rust value live, and what does
-                                    <code>Box</code> change?<small
-                                        ><b>Stack and heap</b> are two ways of
-                                        organising memory, not two kinds of
-                                        chip.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-rust">Rust</span
-                                    ><span class="tag tag-comp"
-                                        >Comp</span
-                                    ></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a href="lessons/10-string-and-vec-memory.html"
-                                ><span class="n">10</span
-                                ><span class="q"
-                                    >What is a <code>Vec</code> made of, and
-                                    what happens when it grows?<small
-                                        >A handle on one side, a contiguous
-                                        buffer on the other.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-rust">Rust</span
-                                    ><span class="tag tag-comp"
-                                        >Comp</span
-                                    ></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                href="lessons/11-ownership-moves-clone-and-drop.html"
-                                ><span class="n">11</span
-                                ><span class="q"
-                                    >Who frees a <code>String</code>'s
-                                    memory?<small
-                                        ><b>Ownership</b> is a language rule
-                                        about responsibility. It does not
-                                        replace the OS or the CPU's memory
-                                        system.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-rust"
-                                        >Rust</span
-                                    ></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                href="lessons/12-references-borrowing-and-lifetimes.html"
-                                ><span class="n">12</span
-                                ><span class="q"
-                                    >How can code use a value it does not
-                                    own?<small
-                                        ><b>Borrowing</b>: references, the two
-                                        rules, and what lifetimes
-                                        describe.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-rust"
-                                        >Rust</span
-                                    ></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                href="lessons/13-iterators-and-following-data.html"
-                                ><span class="n">13</span
-                                ><span class="q"
-                                    >What does a loop over a
-                                    <code>Vec</code> actually hand you?<small
-                                        ><code>iter</code>,
-                                        <code>iter_mut</code> and
-                                        <code>into_iter</code>, seen in
-                                        memory.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-rust"
-                                        >Rust</span
-                                    ></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                href="lessons/14-memory-bugs-and-rust-safety.html"
-                                ><span class="n">14</span
-                                ><span class="q"
-                                    >How do memory bugs happen, and what does
-                                    Rust change?<small
-                                        >Stack overflow, out-of-bounds access,
-                                        use-after-free.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-rust"
-                                        >Rust</span
-                                    ></span
-                                ></a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                href="lessons/15-follow-one-example-end-to-end.html"
-                                ><span class="n">15</span
-                                ><span class="q"
-                                    >What happens, layer by layer, when
-                                    <code>total(&amp;scores)</code> runs?<small
-                                        >Every layer at once, one event at a
-                                        time.</small
-                                    ></span
-                                ><span class="tags"
-                                    ><span class="tag tag-rust">Rust</span
-                                    ><span class="tag tag-hw">HW</span></span
-                                ></a
-                            >
-                        </li>
-                    </ol>
+<ol class="contents">
+  <li><a href="lessons/01-what-is-a-program.html"><span class="n">01</span><span class="q">What is a program?<small>The <b>program</b> is instructions and data prepared for running. Text becomes an executable file; the OS turns the file into a running process.</small></span><span class="tags"><span class="tag tag-comp">Comp</span></span></a></li>
+  <li><a href="lessons/02-how-a-cpu-runs-code.html"><span class="n">02</span><span class="q">How does a CPU run code?<small>The <b>CPU</b> runs machine instructions, using registers and execution units.</small></span><span class="tags"><span class="tag tag-hw">HW</span></span></a></li>
+  <li><a href="lessons/03-programs-processes-and-the-kernel.html"><span class="n">03</span><span class="q">What does a program get when it starts running?<small>The <b>operating system</b> starts programs and manages resources. A <b>process</b> is a running instance with its own address space.</small></span><span class="tags"><span class="tag tag-os">OS</span></span></a></li>
+  <li><a href="lessons/04-virtual-memory.html"><span class="n">04</span><span class="q">What is inside a process's address space?<small><b>Virtual memory</b> is the address space a process uses: code, data, heap, libraries, stacks.</small></span><span class="tags"><span class="tag tag-os">OS</span></span></a></li>
+  <li><a href="lessons/05-physical-ram-and-address-translation.html"><span class="n">05</span><span class="q">How does a virtual address reach physical RAM?<small><b>Physical RAM</b> is real hardware memory. The OS and the MMU map virtual pages onto its frames.</small></span><span class="tags"><span class="tag tag-hw">HW</span><span class="tag tag-os">OS</span></span></a></li>
+  <li><a href="lessons/06-threads-and-their-stacks.html"><span class="n">06</span><span class="q">What do threads share, and what does each keep to itself?<small>A <b>thread</b> is a path of execution in a process, with its own execution state and its own stack.</small></span><span class="tags"><span class="tag tag-os">OS</span></span></a></li>
+  <li><a href="lessons/07-registers-caches-and-a-memory-read.html"><span class="n">07</span><span class="q">Where do the bytes of one memory read come from?<small><b>Registers and caches</b> let the CPU work without going to RAM for every value.</small></span><span class="tags"><span class="tag tag-hw">HW</span></span></a></li>
+  <li><a href="lessons/08-function-calls-and-stack-frames.html"><span class="n">08</span><span class="q">What happens on the stack when one function calls another?<small>The <b>stack</b> holds the active calls of one thread, in order.</small></span><span class="tags"><span class="tag tag-comp">Comp</span></span></a></li>
+  <li><a href="lessons/09-rust-values-stack-heap-and-box.html"><span class="n">09</span><span class="q">Where does a Rust value live, and what does <code>Box</code> change?<small><b>Stack and heap</b> are two ways of organising memory, not two kinds of chip.</small></span><span class="tags"><span class="tag tag-rust">Rust</span><span class="tag tag-comp">Comp</span></span></a></li>
+  <li><a href="lessons/10-string-and-vec-memory.html"><span class="n">10</span><span class="q">What is a <code>Vec</code> made of, and what happens when it grows?<small>A handle on one side, a contiguous buffer on the other.</small></span><span class="tags"><span class="tag tag-rust">Rust</span><span class="tag tag-comp">Comp</span></span></a></li>
+  <li><a href="lessons/11-ownership-moves-clone-and-drop.html"><span class="n">11</span><span class="q">Who frees a <code>String</code>'s memory?<small><b>Ownership</b> is a language rule about responsibility. It does not replace the OS or the CPU's memory system.</small></span><span class="tags"><span class="tag tag-rust">Rust</span></span></a></li>
+  <li><a href="lessons/12-references-borrowing-and-lifetimes.html"><span class="n">12</span><span class="q">How can code use a value it does not own?<small><b>Borrowing</b>: references, the two rules, and what lifetimes describe.</small></span><span class="tags"><span class="tag tag-rust">Rust</span></span></a></li>
+  <li><a href="lessons/13-iterators-and-following-data.html"><span class="n">13</span><span class="q">What does a loop over a <code>Vec</code> actually hand you?<small><code>iter</code>, <code>iter_mut</code> and <code>into_iter</code>, seen in memory.</small></span><span class="tags"><span class="tag tag-rust">Rust</span></span></a></li>
+  <li><a href="lessons/14-memory-bugs-and-rust-safety.html"><span class="n">14</span><span class="q">How do memory bugs happen, and what does Rust change?<small>Stack overflow, out-of-bounds access, use-after-free.</small></span><span class="tags"><span class="tag tag-rust">Rust</span></span></a></li>
+  <li><a href="lessons/15-follow-one-example-end-to-end.html"><span class="n">15</span><span class="q">What happens, layer by layer, when <code>total(&amp;scores)</code> runs?<small>Every layer at once, one event at a time.</small></span><span class="tags"><span class="tag tag-rust">Rust</span><span class="tag tag-hw">HW</span></span></a></li>
+</ol>
 
-                    <h2 id="how-to-read-the-pictures">
-                        How to read the pictures
-                    </h2>
-                    <p>
-                        Most topics have a diagram with <b>Back</b> and
-                        <b>Next</b> buttons. Each step changes one thing, and a
-                        sentence under the buttons says what changed. The arrow
-                        keys also step through a diagram once it has focus.
-                        Without JavaScript, the diagrams show their finished
-                        state with every step written out below.
-                    </p>
-                    <p>
-                        Some numbers come from a real program, built and run on
-                        Linux, x86-64, with <code>rustc 1.98.1</code>. Those are
-                        marked as real, and they will be different on your
-                        machine. Other numbers are made up to keep an example
-                        small, and those are marked as illustrative. Each
-                        diagram also has a short note of what it leaves out.
-                    </p>
-                    <p>
-                        Facts come with a link to where they were checked, such
-                        as
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/std/vec/struct.Vec.html"
-                            >Vec docs</a
-                        >. Links marked
-                        <a
-                            class="ext"
-                            href="https://en.wikipedia.org/wiki/Virtual_memory"
-                            >Wikipedia</a
-                        >
-                        are for further reading on a general idea. The full list
-                        of sources, the glossary and the concept map are in the
-                        <code>reference</code> folder.
-                    </p>
+<h2 id="how-to-read-the-pictures">How to read the pictures</h2>
+<p>
+  Most topics have a diagram with <b>Back</b> and <b>Next</b> buttons. Each step changes one thing, and a sentence under the buttons says what changed. The arrow keys also step through a diagram once it has focus. Without JavaScript, the diagrams show their finished state with every step written out below.
+</p>
+<p>
+  Some numbers come from a real program, built and run on Linux, x86-64, with <code>rustc 1.98.1</code>. Those are marked as real, and they will be different on your machine. Other numbers are made up to keep an example small, and those are marked as illustrative. Each diagram also has a short note of what it leaves out.
+</p>
+<p>
+  Facts come with a link to where they were checked, such as <a class="src" href="https://doc.rust-lang.org/std/vec/struct.Vec.html">Vec docs</a>. Links marked <a class="ext" href="https://en.wikipedia.org/wiki/Virtual_memory">Wikipedia</a> are for further reading on a general idea. The full list of sources, the glossary and the concept map are in the <code>reference</code> folder.
+</p>
 
-                    <nav class="pager" aria-label="Next">
-                        <a
-                            class="pager__next"
-                            href="lessons/01-what-is-a-program.html"
-                            rel="next"
-                            ><span class="pager__dir">Start →</span
-                            ><span class="pager__q">What is a program?</span></a
-                        >
-                    </nav>
-                </article>
-                <footer class="foot">
-                    <p>
-                        Observed values, such as addresses, sizes, assembly and
-                        program output, come from one machine. It runs Linux 7.0
-                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
-                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
-                        limit. Addresses change on every run, and other systems,
-                        toolchains and allocators can differ. Details:
-                        <a href="reference/sources.html">Sources</a> ·
-                        <code>examples/OUTPUT.txt</code>.
-                    </p>
-                </footer>
-            </main>
-            <nav class="otp" aria-label="On this page">
-                <p class="otp__h">On this page</p>
-                <ol class="otp__list">
-                    <li class="lv2"><a href="#the-route">The route</a></li>
-                    <li class="lv2">
-                        <a href="#how-to-read-the-pictures"
-                            >How to read the pictures</a
-                        >
-                    </li>
-                </ol>
-            </nav>
-        </div>
-    </body>
+<nav class="pager" aria-label="Next">
+  <a class="pager__next" href="lessons/01-what-is-a-program.html" rel="next"><span class="pager__dir">Start →</span><span class="pager__q">What is a program?</span></a>
+</nav>
+</article>
+<footer class="foot"><p>Observed values, such as addresses, sizes, assembly and program output, come from one machine. It runs Linux 7.0 (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack limit. Addresses change on every run, and other systems, toolchains and allocators can differ. Details: <a href="reference/sources.html">Sources</a> · <code>examples/OUTPUT.txt</code>.</p></footer>
+</main>
+<nav class="otp" aria-label="On this page"><p class="otp__h">On this page</p><ol class="otp__list"><li class="lv2"><a href="#the-route">The route</a></li><li class="lv2"><a href="#how-to-read-the-pictures">How to read the pictures</a></li></ol></nav>
+</div>
+</body>
 </html>

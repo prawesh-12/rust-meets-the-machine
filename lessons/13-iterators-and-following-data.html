@@ -1,502 +1,134 @@
 <!doctype html>
 <html lang="en" class="no-js">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>
-            What does a loop over a Vec actually hand you? — How a Rust program
-            meets the machine
-        </title>
-        <meta
-            name="description"
-            content="What a for loop over a Vec actually hands you: the iterator as a separate value with a cursor into the buffer, and the difference between iter, iter_mut and into_iter in terms of borrowing and ownership."
-        />
-        <link rel="stylesheet" href="../assets/css/site.css" />
-        <script src="../assets/js/site.js"></script>
-        <script src="../assets/js/diagrams.js" defer></script>
-    </head>
-    <body>
-        <a class="skip" href="#main">Skip to the text</a>
-        <header class="top">
-            <a class="top__title" href="../index.html"
-                >How a Rust program meets the machine</a
-            >
-            <span class="top__here">13 · Iterators</span>
-            <span class="top__spacer"></span>
-            <button
-                class="top__btn"
-                type="button"
-                data-toc-toggle
-                aria-expanded="false"
-                aria-controls="toc"
-            >
-                Contents
-            </button>
-        </header>
-        <div class="shell">
-            <nav class="toc" id="toc" aria-label="Contents">
-                <a class="toc__home" href="../index.html">The whole map</a>
-                <p class="toc__group">Before your code runs</p>
-                <ol>
-                    <li>
-                        <a href="01-what-is-a-program.html"
-                            ><span class="n">01</span
-                            ><span>What a program is</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="02-how-a-cpu-runs-code.html"
-                            ><span class="n">02</span
-                            ><span>How a CPU runs code</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="03-programs-processes-and-the-kernel.html"
-                            ><span class="n">03</span
-                            ><span>Processes and the kernel</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Addresses</p>
-                <ol>
-                    <li>
-                        <a href="04-virtual-memory.html"
-                            ><span class="n">04</span
-                            ><span>Inside an address space</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="05-physical-ram-and-address-translation.html"
-                            ><span class="n">05</span
-                            ><span>From virtual address to RAM</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="06-threads-and-their-stacks.html"
-                            ><span class="n">06</span
-                            ><span>Threads and their stacks</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="07-registers-caches-and-a-memory-read.html"
-                            ><span class="n">07</span
-                            ><span>Caches and one load</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Calls and data</p>
-                <ol>
-                    <li>
-                        <a href="08-function-calls-and-stack-frames.html"
-                            ><span class="n">08</span
-                            ><span>Calls and stack frames</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="09-rust-values-stack-heap-and-box.html"
-                            ><span class="n">09</span
-                            ><span>Values, stack, heap, Box</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="10-string-and-vec-memory.html"
-                            ><span class="n">10</span
-                            ><span>String and Vec</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Rust's rules</p>
-                <ol>
-                    <li>
-                        <a href="11-ownership-moves-clone-and-drop.html"
-                            ><span class="n">11</span
-                            ><span>Ownership, moves, drop</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="12-references-borrowing-and-lifetimes.html"
-                            ><span class="n">12</span
-                            ><span>References and lifetimes</span></a
-                        >
-                    </li>
-                    <li>
-                        <a
-                            href="13-iterators-and-following-data.html"
-                            aria-current="page"
-                            ><span class="n">13</span><span>Iterators</span></a
-                        >
-                        <ol class="toc__sub">
-                            <li class="lv2">
-                                <a href="#an-iterator-is-its-own-value"
-                                    >An iterator is its own value</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#the-three-forms">The three forms</a>
-                            </li>
-                            <li class="lv2">
-                                <a href="#what-examples-iterm-rs-printed"
-                                    >What examples/iterm.rs printed</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#after-into-iter-scores-is-gone"
-                                    >After into_iter, scores is gone</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a
-                                    href="#why-a-loop-cannot-push-to-the-vector-it-walks"
-                                    >Why a loop cannot push to the vector it
-                                    walks</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#keep-h">What to remember</a>
-                            </li>
-                            <li class="lv2">
-                                <a href="#test-h">Check your understanding</a>
-                            </li>
-                        </ol>
-                    </li>
-                    <li>
-                        <a href="14-memory-bugs-and-rust-safety.html"
-                            ><span class="n">14</span
-                            ><span>Memory bugs and safety</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">All together</p>
-                <ol>
-                    <li>
-                        <a href="15-follow-one-example-end-to-end.html"
-                            ><span class="n">15</span
-                            ><span>One call, every layer</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Reference</p>
-                <ul class="toc__ref">
-                    <li><a href="../reference/glossary.html">Glossary</a></li>
-                    <li><a href="../reference/sources.html">Sources</a></li>
-                    <li>
-                        <a href="../reference/concept-map.html">Concept map</a>
-                    </li>
-                </ul>
-            </nav>
-            <main id="main">
-                <article class="page">
-                    <header class="opening">
-                        <div class="opening__meta">
-                            <span class="opening__num">13</span
-                            ><span class="tag tag-rust">Rust</span>
-                        </div>
-                        <h1>What does a loop over a Vec actually hand you?</h1>
-                        <p class="why">
-                            The function <code>total</code> in the example
-                            program walks through <code>scores</code> with
-                            <code>for v in values.iter()</code>. A loop like
-                            that combines a
-                            <a href="10-string-and-vec-memory.html">buffer</a>,
-                            <a href="11-ownership-moves-clone-and-drop.html"
-                                >ownership</a
-                            >
-                            and
-                            <a href="12-references-borrowing-and-lifetimes.html"
-                                >borrowing</a
-                            >. Each step of the loop hands you one item, and the
-                            way the loop is written decides what kind of item it
-                            is.
-                        </p>
-                    </header>
-                    <ul
-                        class="legend"
-                        aria-label="Which layer each colour means"
-                    >
-                        <li><span class="sw sw-rust"></span>Rust language</li>
-                        <li>
-                            <span class="sw sw-comp"></span>Compiler &amp;
-                            runtime library
-                        </li>
-                        <li><span class="sw sw-os"></span>Operating system</li>
-                        <li>
-                            <span class="sw sw-hw"></span>CPU &amp; hardware
-                        </li>
-                    </ul>
-                    <h2 id="an-iterator-is-its-own-value">
-                        An iterator is its own value
-                    </h2>
-                    <p>
-                        An
-                        <a
-                            href="https://en.wikipedia.org/wiki/Iterator"
-                            class="ext"
-                            >iterator</a
-                        >
-                        is a value with one important method,
-                        <code>next()</code>. Each call returns
-                        <code>Some(item)</code>, or <code>None</code> when there
-                        is nothing left
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/std/iter/index.html"
-                            >std::iter</a
-                        >
-                        <span class="tag tag-rust">Rust</span>. The iterator is
-                        separate from the <code>Vec</code>: it holds its own
-                        position and refers to the buffer, either through a
-                        borrow or by owning it. Creating one reads nothing; the
-                        documentation calls iterators lazy: "Nothing really
-                        happens until you call next"
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/std/iter/index.html#laziness"
-                            >std::iter: laziness</a
-                        >.
-                    </p>
-                    <p>
-                        A <code>for</code> loop is "sugar for iterators"
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/std/iter/index.html#for-loops-and-intoiterator"
-                            >std::iter: for loops</a
-                        >. It turns what follows <code>in</code> into an
-                        iterator with <code>IntoIterator::into_iter</code>, then
-                        calls <code>next()</code> until it gets
-                        <code>None</code>
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/reference/expressions/loop-expr.html#iterator-loops"
-                            >Reference: iterator loops</a
-                        >.
-                    </p>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What does a loop over a Vec actually hand you? — How a Rust program meets the machine</title>
+<meta name="description" content="What a for loop over a Vec actually hands you: the iterator as a separate value with a cursor into the buffer, and the difference between iter, iter_mut and into_iter in terms of borrowing and ownership.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/diagrams.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the text</a>
+<header class="top">
+  <a class="top__title" href="../index.html">How a Rust program meets the machine</a>
+  <span class="top__here">13 · Iterators</span>
+  <span class="top__spacer"></span>
+  <button class="top__btn" type="button" data-toc-toggle aria-expanded="false" aria-controls="toc">Contents</button>
+</header>
+<div class="shell">
+<nav class="toc" id="toc" aria-label="Contents">
+<a class="toc__home" href="../index.html">The whole map</a>
+<p class="toc__group">Before your code runs</p><ol>
+<li><a href="01-what-is-a-program.html"><span class="n">01</span><span>What a program is</span></a></li>
+<li><a href="02-how-a-cpu-runs-code.html"><span class="n">02</span><span>How a CPU runs code</span></a></li>
+<li><a href="03-programs-processes-and-the-kernel.html"><span class="n">03</span><span>Processes and the kernel</span></a></li>
+</ol>
+<p class="toc__group">Addresses</p><ol>
+<li><a href="04-virtual-memory.html"><span class="n">04</span><span>Inside an address space</span></a></li>
+<li><a href="05-physical-ram-and-address-translation.html"><span class="n">05</span><span>From virtual address to RAM</span></a></li>
+<li><a href="06-threads-and-their-stacks.html"><span class="n">06</span><span>Threads and their stacks</span></a></li>
+<li><a href="07-registers-caches-and-a-memory-read.html"><span class="n">07</span><span>Caches and one load</span></a></li>
+</ol>
+<p class="toc__group">Calls and data</p><ol>
+<li><a href="08-function-calls-and-stack-frames.html"><span class="n">08</span><span>Calls and stack frames</span></a></li>
+<li><a href="09-rust-values-stack-heap-and-box.html"><span class="n">09</span><span>Values, stack, heap, Box</span></a></li>
+<li><a href="10-string-and-vec-memory.html"><span class="n">10</span><span>String and Vec</span></a></li>
+</ol>
+<p class="toc__group">Rust's rules</p><ol>
+<li><a href="11-ownership-moves-clone-and-drop.html"><span class="n">11</span><span>Ownership, moves, drop</span></a></li>
+<li><a href="12-references-borrowing-and-lifetimes.html"><span class="n">12</span><span>References and lifetimes</span></a></li>
+<li><a href="13-iterators-and-following-data.html" aria-current="page"><span class="n">13</span><span>Iterators</span></a><ol class="toc__sub"><li class="lv2"><a href="#an-iterator-is-its-own-value">An iterator is its own value</a></li><li class="lv2"><a href="#the-three-forms">The three forms</a></li><li class="lv2"><a href="#what-examples-iterm-rs-printed">What examples/iterm.rs printed</a></li><li class="lv2"><a href="#after-into-iter-scores-is-gone">After into_iter, scores is gone</a></li><li class="lv2"><a href="#why-a-loop-cannot-push-to-the-vector-it-walks">Why a loop cannot push to the vector it walks</a></li><li class="lv2"><a href="#keep-h">What to remember</a></li><li class="lv2"><a href="#test-h">Check your understanding</a></li></ol></li>
+<li><a href="14-memory-bugs-and-rust-safety.html"><span class="n">14</span><span>Memory bugs and safety</span></a></li>
+</ol>
+<p class="toc__group">All together</p><ol>
+<li><a href="15-follow-one-example-end-to-end.html"><span class="n">15</span><span>One call, every layer</span></a></li>
+</ol>
+<p class="toc__group">Reference</p><ul class="toc__ref">
+<li><a href="../reference/glossary.html">Glossary</a></li>
+<li><a href="../reference/sources.html">Sources</a></li>
+<li><a href="../reference/concept-map.html">Concept map</a></li>
+</ul>
+</nav>
+<main id="main">
+<article class="page">
+<header class="opening">
+  <div class="opening__meta"><span class="opening__num">13</span><span class="tag tag-rust">Rust</span></div>
+  <h1>What does a loop over a Vec actually hand you?</h1>
+  <p class="why">The function <code>total</code> in the example program walks through <code>scores</code> with <code>for v in values.iter()</code>. A loop like that combines a <a href="10-string-and-vec-memory.html">buffer</a>, <a href="11-ownership-moves-clone-and-drop.html">ownership</a> and <a href="12-references-borrowing-and-lifetimes.html">borrowing</a>. Each step of the loop hands you one item, and the way the loop is written decides what kind of item it is.</p>
+</header>
+<ul class="legend" aria-label="Which layer each colour means"><li><span class="sw sw-rust"></span>Rust language</li><li><span class="sw sw-comp"></span>Compiler &amp; runtime library</li><li><span class="sw sw-os"></span>Operating system</li><li><span class="sw sw-hw"></span>CPU &amp; hardware</li></ul>
+<h2 id="an-iterator-is-its-own-value">An iterator is its own value</h2>
+<p>
+  An <a href="https://en.wikipedia.org/wiki/Iterator" class="ext">iterator</a> is a value with one important method, <code>next()</code>. Each call returns <code>Some(item)</code>, or <code>None</code> when there is nothing left <a class="src" href="https://doc.rust-lang.org/std/iter/index.html">std::iter</a> <span class="tag tag-rust">Rust</span>. The iterator is separate from the <code>Vec</code>: it holds its own position and refers to the buffer, either through a borrow or by owning it. Creating one reads nothing; the documentation calls iterators lazy: "Nothing really happens until you call next" <a class="src" href="https://doc.rust-lang.org/std/iter/index.html#laziness">std::iter: laziness</a>.
+</p>
+<p>
+  A <code>for</code> loop is "sugar for iterators" <a class="src" href="https://doc.rust-lang.org/std/iter/index.html#for-loops-and-intoiterator">std::iter: for loops</a>. It turns what follows <code>in</code> into an iterator with <code>IntoIterator::into_iter</code>, then calls <code>next()</code> until it gets <code>None</code> <a class="src" href="https://doc.rust-lang.org/reference/expressions/loop-expr.html#iterator-loops">Reference: iterator loops</a>.
+</p>
 
-                    <h2 id="the-three-forms">The three forms</h2>
-                    <p>
-                        The documentation lists "three common methods which can
-                        create iterators from a collection: <code>iter()</code>,
-                        which iterates over <code>&amp;T</code>.
-                        <code>iter_mut()</code>, which iterates over
-                        <code>&amp;mut T</code>. <code>into_iter()</code>, which
-                        iterates over <code>T</code>"
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/std/iter/index.html#the-three-forms-of-iteration"
-                            >std::iter: the three forms</a
-                        >. Each one makes the iterator borrow or own the
-                        <code>Vec</code> in a different way:
-                    </p>
+<h2 id="the-three-forms">The three forms</h2>
+<p>
+  The documentation lists "three common methods which can create iterators from a collection: <code>iter()</code>, which iterates over <code>&amp;T</code>. <code>iter_mut()</code>, which iterates over <code>&amp;mut T</code>. <code>into_iter()</code>, which iterates over <code>T</code>" <a class="src" href="https://doc.rust-lang.org/std/iter/index.html#the-three-forms-of-iteration">std::iter: the three forms</a>. Each one makes the iterator borrow or own the <code>Vec</code> in a different way:
+</p>
 
-                    <figure
-                        class="fig"
-                        data-fig="iter"
-                        data-label="iterator diagram"
-                    >
-                        <div class="fig__head">
-                            <p class="fig__title">
-                                One loop over <code>scores</code>, three ways
-                            </p>
-                            <span class="fig__kind"
-                                >Iterator sizes observed · its fields
-                                illustrative</span
-                            >
-                        </div>
-                        <div class="controls">
-                            <span class="controls__label">Loop over</span>
-                            <div class="seg" data-choice="mode">
-                                <button
-                                    class="btn"
-                                    type="button"
-                                    data-value="iter"
-                                    aria-pressed="true"
-                                >
-                                    <code>iter()</code>
-                                </button>
-                                <button
-                                    class="btn"
-                                    type="button"
-                                    data-value="iter_mut"
-                                >
-                                    <code>iter_mut()</code>
-                                </button>
-                                <button
-                                    class="btn"
-                                    type="button"
-                                    data-value="into_iter"
-                                >
-                                    <code>into_iter()</code>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="fig__grid fig__grid--note">
-                            <div class="fig__body">
-                                <div class="callstack callstack--2">
-                                    <pre
-                                        class="src-lines js-only"
-                                    ><code data-iter-code></code></pre>
-                                    <div class="iterfig js-only"></div>
-                                </div>
-                                <div class="no-js-only">
-                                    <div class="table-wrap">
-                                        <table>
-                                            <thead>
-                                                <tr>
-                                                    <th scope="col">Loop</th>
-                                                    <th scope="col">
-                                                        Each item
-                                                    </th>
-                                                    <th scope="col">
-                                                        <code>scores</code>
-                                                        during the loop
-                                                    </th>
-                                                    <th scope="col">
-                                                        After the loop
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr>
-                                                    <td>
-                                                        <code
-                                                            >for s in
-                                                            scores.iter()</code
-                                                        >
-                                                    </td>
-                                                    <td>
-                                                        <code>&amp;i32</code>
-                                                        into the buffer
-                                                    </td>
-                                                    <td>shared borrow</td>
-                                                    <td>usable, unchanged</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>
-                                                        <code
-                                                            >for s in
-                                                            scores.iter_mut()</code
-                                                        >
-                                                    </td>
-                                                    <td>
-                                                        <code
-                                                            >&amp;mut i32</code
-                                                        >
-                                                        into the buffer
-                                                    </td>
-                                                    <td>mutable borrow</td>
-                                                    <td>
-                                                        usable, holds 11, 21, 31
-                                                        after
-                                                        <code>*s += 1</code>
-                                                    </td>
-                                                </tr>
-                                                <tr>
-                                                    <td>
-                                                        <code
-                                                            >for s in
-                                                            scores.into_iter()</code
-                                                        >
-                                                    </td>
-                                                    <td>
-                                                        <code>i32</code>, moved
-                                                        out
-                                                    </td>
-                                                    <td>
-                                                        moved into the iterator
-                                                    </td>
-                                                    <td>
-                                                        gone; buffer freed when
-                                                        the iterator is dropped
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                <div class="tl-key js-only">
-                                    <span
-                                        ><i class="ref-k"></i>shared reference
-                                        <code>&amp;</code></span
-                                    ><span
-                                        ><i class="mut-k"></i>mutable reference
-                                        <code>&amp;mut</code></span
-                                    ><span
-                                        ><i class="own-k"></i>owned value</span
-                                    >
-                                </div>
-                                <div
-                                    class="controls"
-                                    data-stepper-controls
-                                ></div>
-                                <p class="now-says" aria-live="polite"></p>
-                                <ol class="steps">
-                                    <li>
-                                        The method call creates a separate
-                                        iterator value. It borrows
-                                        <code>scores</code>, or for
-                                        <code>into_iter</code>, takes ownership
-                                        of it.
-                                    </li>
-                                    <li>
-                                        First <code>next()</code>: the item for
-                                        element 0, a reference into the buffer
-                                        or, for <code>into_iter</code>, the
-                                        element itself.
-                                    </li>
-                                    <li>
-                                        Second <code>next()</code>: element 1.
-                                    </li>
-                                    <li>
-                                        Third <code>next()</code>: element 2.
-                                    </li>
-                                    <li>
-                                        <code>next()</code> returns
-                                        <code>None</code>, the loop ends and the
-                                        iterator is dropped: the borrow ends, or
-                                        the buffer is freed.
-                                    </li>
-                                </ol>
-                            </div>
-                            <aside class="leaves-out">
-                                <h4>What this picture leaves out</h4>
-                                <ul>
-                                    <li>
-                                        The iterator's real fields. Its size was
-                                        measured (16 bytes for
-                                        <code>Iter</code> and
-                                        <code>IterMut</code>, 32 for
-                                        <code>IntoIter</code>), but the layout
-                                        is private to the standard library.
-                                        "next" and "end" are a common way to
-                                        build one.
-                                    </li>
-                                    <li>
-                                        Optimisation. In a release build the
-                                        iterator usually becomes a pointer in a
-                                        register, or the loop is unrolled or
-                                        vectorised. There may be no iterator in
-                                        memory at all.
-                                    </li>
-                                    <li>
-                                        "Moved out" is a statement about
-                                        ownership. The bytes in the buffer are
-                                        not cleared when
-                                        <code>into_iter</code> hands an element
-                                        over.
-                                    </li>
-                                </ul>
-                            </aside>
-                        </div>
-                    </figure>
+<figure class="fig" data-fig="iter" data-label="iterator diagram">
+  <div class="fig__head">
+    <p class="fig__title">One loop over <code>scores</code>, three ways</p>
+    <span class="fig__kind">Iterator sizes observed · its fields illustrative</span>
+  </div>
+  <div class="controls">
+    <span class="controls__label">Loop over</span>
+    <div class="seg" data-choice="mode">
+      <button class="btn" type="button" data-value="iter" aria-pressed="true"><code>iter()</code></button>
+      <button class="btn" type="button" data-value="iter_mut"><code>iter_mut()</code></button>
+      <button class="btn" type="button" data-value="into_iter"><code>into_iter()</code></button>
+    </div>
+  </div>
+  <div class="fig__grid fig__grid--note">
+    <div class="fig__body">
+      <div class="callstack callstack--2">
+<pre class="src-lines js-only"><code data-iter-code></code></pre>
+        <div class="iterfig js-only"></div>
+      </div>
+      <div class="no-js-only">
+        <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Loop</th><th scope="col">Each item</th><th scope="col"><code>scores</code> during the loop</th><th scope="col">After the loop</th></tr></thead>
+          <tbody>
+            <tr><td><code>for s in scores.iter()</code></td><td><code>&amp;i32</code> into the buffer</td><td>shared borrow</td><td>usable, unchanged</td></tr>
+            <tr><td><code>for s in scores.iter_mut()</code></td><td><code>&amp;mut i32</code> into the buffer</td><td>mutable borrow</td><td>usable, holds 11, 21, 31 after <code>*s += 1</code></td></tr>
+            <tr><td><code>for s in scores.into_iter()</code></td><td><code>i32</code>, moved out</td><td>moved into the iterator</td><td>gone; buffer freed when the iterator is dropped</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+      <div class="tl-key js-only"><span><i class="ref-k"></i>shared reference <code>&amp;</code></span><span><i class="mut-k"></i>mutable reference <code>&amp;mut</code></span><span><i class="own-k"></i>owned value</span></div>
+      <div class="controls" data-stepper-controls></div>
+      <p class="now-says" aria-live="polite"></p>
+      <ol class="steps">
+        <li>The method call creates a separate iterator value. It borrows <code>scores</code>, or for <code>into_iter</code>, takes ownership of it.</li>
+        <li>First <code>next()</code>: the item for element 0, a reference into the buffer or, for <code>into_iter</code>, the element itself.</li>
+        <li>Second <code>next()</code>: element 1.</li>
+        <li>Third <code>next()</code>: element 2.</li>
+        <li><code>next()</code> returns <code>None</code>, the loop ends and the iterator is dropped: the borrow ends, or the buffer is freed.</li>
+      </ol>
+    </div>
+    <aside class="leaves-out">
+      <h4>What this picture leaves out</h4>
+      <ul>
+        <li>The iterator's real fields. Its size was measured (16 bytes for <code>Iter</code> and <code>IterMut</code>, 32 for <code>IntoIter</code>), but the layout is private to the standard library. "next" and "end" are a common way to build one.</li>
+        <li>Optimisation. In a release build the iterator usually becomes a pointer in a register, or the loop is unrolled or vectorised. There may be no iterator in memory at all.</li>
+        <li>"Moved out" is a statement about ownership. The bytes in the buffer are not cleared when <code>into_iter</code> hands an element over.</li>
+      </ul>
+    </aside>
+  </div>
+</figure>
 
-                    <h2 id="what-examples-iterm-rs-printed">
-                        What <code>examples/iterm.rs</code> printed
-                    </h2>
-                    <div class="codeblock">
-                        <div class="codeblock__label">
-                            <span>Output</span
-                            ><span>from <code>examples/OUTPUT.txt</code></span>
-                        </div>
-                        <pre class="out"><code>11
+<h2 id="what-examples-iterm-rs-printed">What <code>examples/iterm.rs</code> printed</h2>
+<div class="codeblock">
+  <div class="codeblock__label"><span>Output</span><span>from <code>examples/OUTPUT.txt</code></span></div>
+<pre class="out"><code>11
 21
 31
 owned 11
@@ -505,35 +137,18 @@ owned 31
 size_of::&lt;std::slice::Iter&lt;i32&gt;&gt;()    = 16
 size_of::&lt;std::slice::IterMut&lt;i32&gt;&gt;() = 16
 size_of::&lt;std::vec::IntoIter&lt;i32&gt;&gt;()  = 32</code></pre>
-                    </div>
-                    <p>
-                        The <code>iter_mut</code> loop added 1 to each element
-                        in place, the <code>iter</code> loop read them through
-                        references, and the <code>into_iter</code> loop took
-                        each one out by value. The sizes show the iterator is a
-                        value of its own, separate from the 24-byte
-                        <code>Vec</code> handle. They are observations of this
-                        toolchain, not guarantees.
-                    </p>
+</div>
+<p>
+  The <code>iter_mut</code> loop added 1 to each element in place, the <code>iter</code> loop read them through references, and the <code>into_iter</code> loop took each one out by value. The sizes show the iterator is a value of its own, separate from the 24-byte <code>Vec</code> handle. They are observations of this toolchain, not guarantees.
+</p>
 
-                    <h2 id="after-into-iter-scores-is-gone">
-                        After <code>into_iter</code>, <code>scores</code> is
-                        gone
-                    </h2>
-                    <p>
-                        <code>into_iter(self)</code> takes the
-                        <code>Vec</code> by value, so it is a
-                        <a href="11-ownership-moves-clone-and-drop.html">move</a
-                        >. Using <code>scores</code> after the loop is rejected:
-                    </p>
-                    <div class="codeblock codeblock--bad">
-                        <div class="codeblock__label">
-                            <span><code>examples/afterinto.rs</code></span
-                            ><span class="verdict">does not compile</span>
-                        </div>
-                        <pre
-                            class="out"
-                        ><code>error[E0382]: borrow of moved value: `scores`
+<h2 id="after-into-iter-scores-is-gone">After <code>into_iter</code>, <code>scores</code> is gone</h2>
+<p>
+  <code>into_iter(self)</code> takes the <code>Vec</code> by value, so it is a <a href="11-ownership-moves-clone-and-drop.html">move</a>. Using <code>scores</code> after the loop is rejected:
+</p>
+<div class="codeblock codeblock--bad">
+  <div class="codeblock__label"><span><code>examples/afterinto.rs</code></span><span class="verdict">does not compile</span></div>
+<pre class="out"><code>error[E0382]: borrow of moved value: `scores`
     |
   3 |     let scores = vec![10, 20, 30];
     |         ------ move occurs because `scores` has type `Vec&lt;i32&gt;`, which does not implement the `Copy` trait
@@ -541,223 +156,59 @@ size_of::&lt;std::vec::IntoIter&lt;i32&gt;&gt;()  = 32</code></pre>
     |                     ----------- `scores` moved due to this method call
   5 |     println!("{:?}", scores);
     |                      ^^^^^^ value borrowed here after move</code></pre>
-                    </div>
-                    <p>
-                        The same happens with plain
-                        <code>for s in scores</code>, because the loop calls
-                        <code>into_iter</code> on <code>scores</code> itself.
-                        Writing <code>for s in &amp;scores</code> calls it on a
-                        reference instead, which gives the same items as
-                        <code>scores.iter()</code>;
-                        <code>for s in &amp;mut scores</code> matches
-                        <code>iter_mut()</code>.
-                    </p>
+</div>
+<p>
+  The same happens with plain <code>for s in scores</code>, because the loop calls <code>into_iter</code> on <code>scores</code> itself. Writing <code>for s in &amp;scores</code> calls it on a reference instead, which gives the same items as <code>scores.iter()</code>; <code>for s in &amp;mut scores</code> matches <code>iter_mut()</code>.
+</p>
 
-                    <h2 id="why-a-loop-cannot-push-to-the-vector-it-walks">
-                        Why a loop cannot push to the vector it walks
-                    </h2>
-                    <p>
-                        While an <code>iter()</code> loop runs, the iterator
-                        holds a shared borrow of <code>scores</code> and a
-                        cursor into its buffer. A
-                        <code>scores.push(…)</code> inside the loop needs
-                        <code>&amp;mut scores</code>, which would conflict, and
-                        could
-                        <a href="10-string-and-vec-memory.html"
-                            >move the buffer</a
-                        >
-                        from under the cursor. The compiler rejects it with
-                        error E0502, the same error as any other
-                        <a href="12-references-borrowing-and-lifetimes.html"
-                            >borrow conflict</a
-                        >. In languages without that check, changing a
-                        collection while iterating over it is a common source of
-                        bugs; Rust turns it into a compile error.
-                    </p>
+<h2 id="why-a-loop-cannot-push-to-the-vector-it-walks">Why a loop cannot push to the vector it walks</h2>
+<p>
+  While an <code>iter()</code> loop runs, the iterator holds a shared borrow of <code>scores</code> and a cursor into its buffer. A <code>scores.push(…)</code> inside the loop needs <code>&amp;mut scores</code>, which would conflict, and could <a href="10-string-and-vec-memory.html">move the buffer</a> from under the cursor. The compiler rejects it with error E0502, the same error as any other <a href="12-references-borrowing-and-lifetimes.html">borrow conflict</a>. In languages without that check, changing a collection while iterating over it is a common source of bugs; Rust turns it into a compile error.
+</p>
 
-                    <div class="aside aside--wrong">
-                        <p class="aside__h">
-                            Three tempting pictures that are wrong
-                        </p>
-                        <p>
-                            "The iterator is the buffer." It is a separate,
-                            small value that refers to the buffer.
-                        </p>
-                        <p>
-                            "A <code>for</code> loop copies the vector."
-                            <code>iter()</code> and <code>iter_mut()</code> copy
-                            nothing; they hand out references.
-                            <code>into_iter()</code> moves the elements out one
-                            by one, and still does not copy the buffer.
-                        </p>
-                        <p>
-                            "The iterator's layout is fixed." Only its behaviour
-                            is documented. Its fields and size belong to the
-                            standard library and can change.
-                        </p>
-                    </div>
+<div class="aside aside--wrong">
+  <p class="aside__h">Three tempting pictures that are wrong</p>
+  <p>"The iterator is the buffer." It is a separate, small value that refers to the buffer.</p>
+  <p>"A <code>for</code> loop copies the vector." <code>iter()</code> and <code>iter_mut()</code> copy nothing; they hand out references. <code>into_iter()</code> moves the elements out one by one, and still does not copy the buffer.</p>
+  <p>"The iterator's layout is fixed." Only its behaviour is documented. Its fields and size belong to the standard library and can change.</p>
+</div>
 
-                    <section class="keep" aria-labelledby="keep-h">
-                        <h2 id="keep-h">What to remember</h2>
-                        <ol>
-                            <li>
-                                An iterator is a separate value with a position;
-                                each <code>next()</code> hands out one item
-                                until it returns <code>None</code>.
-                            </li>
-                            <li>
-                                <code>iter()</code> gives
-                                <code>&amp;T</code> and borrows,
-                                <code>iter_mut()</code> gives
-                                <code>&amp;mut T</code> and borrows mutably,
-                                <code>into_iter()</code> gives
-                                <code>T</code> and consumes the collection.
-                            </li>
-                            <li>
-                                A <code>for</code> loop calls
-                                <code>into_iter</code> on whatever follows
-                                <code>in</code>; <code>&amp;scores</code> and
-                                <code>scores</code> behave differently.
-                            </li>
-                        </ol>
-                    </section>
+<section class="keep" aria-labelledby="keep-h">
+  <h2 id="keep-h">What to remember</h2>
+  <ol>
+    <li>An iterator is a separate value with a position; each <code>next()</code> hands out one item until it returns <code>None</code>.</li>
+    <li><code>iter()</code> gives <code>&amp;T</code> and borrows, <code>iter_mut()</code> gives <code>&amp;mut T</code> and borrows mutably, <code>into_iter()</code> gives <code>T</code> and consumes the collection.</li>
+    <li>A <code>for</code> loop calls <code>into_iter</code> on whatever follows <code>in</code>; <code>&amp;scores</code> and <code>scores</code> behave differently.</li>
+  </ol>
+</section>
 
-                    <section class="test" aria-labelledby="test-h">
-                        <h2 id="test-h">Check your understanding</h2>
-                        <details>
-                            <summary>
-                                What is the type of <code>s</code> in
-                                <code>for s in scores.iter()</code> when
-                                <code>scores</code> is a
-                                <code>Vec&lt;i32&gt;</code>?
-                            </summary>
-                            <div>
-                                <p>
-                                    <code>&amp;i32</code>: a reference to an
-                                    element in the buffer.
-                                </p>
-                            </div>
-                        </details>
-                        <details>
-                            <summary>
-                                Can you use <code>scores</code> after
-                                <code>for s in scores { … }</code>?
-                            </summary>
-                            <div>
-                                <p>
-                                    No. The loop called
-                                    <code>into_iter</code> on
-                                    <code>scores</code>, which moved it. Loop
-                                    over <code>&amp;scores</code> to keep it.
-                                </p>
-                            </div>
-                        </details>
-                        <details>
-                            <summary>
-                                When is the buffer freed in an
-                                <code>into_iter()</code> loop?
-                            </summary>
-                            <div>
-                                <p>
-                                    When the iterator is dropped, after the loop
-                                    ends. The iterator owned the buffer from the
-                                    moment it was created.
-                                </p>
-                            </div>
-                        </details>
-                    </section>
+<section class="test" aria-labelledby="test-h">
+  <h2 id="test-h">Check your understanding</h2>
+  <details>
+    <summary>What is the type of <code>s</code> in <code>for s in scores.iter()</code> when <code>scores</code> is a <code>Vec&lt;i32&gt;</code>?</summary>
+    <div><p><code>&amp;i32</code>: a reference to an element in the buffer.</p></div>
+  </details>
+  <details>
+    <summary>Can you use <code>scores</code> after <code>for s in scores { … }</code>?</summary>
+    <div><p>No. The loop called <code>into_iter</code> on <code>scores</code>, which moved it. Loop over <code>&amp;scores</code> to keep it.</p></div>
+  </details>
+  <details>
+    <summary>When is the buffer freed in an <code>into_iter()</code> loop?</summary>
+    <div><p>When the iterator is dropped, after the loop ends. The iterator owned the buffer from the moment it was created.</p></div>
+  </details>
+</section>
 
-                    <p class="related">
-                        <b>Related:</b>
-                        <a href="10-string-and-vec-memory.html">the buffer</a> ·
-                        <a href="11-ownership-moves-clone-and-drop.html"
-                            >moves</a
-                        >
-                        ·
-                        <a href="12-references-borrowing-and-lifetimes.html"
-                            >borrow conflicts</a
-                        >
-                        ·
-                        <a href="15-follow-one-example-end-to-end.html"
-                            >the loop in <code>total</code>, at every layer</a
-                        >
-                    </p>
+<p class="related"><b>Related:</b> <a href="10-string-and-vec-memory.html">the buffer</a> · <a href="11-ownership-moves-clone-and-drop.html">moves</a> · <a href="12-references-borrowing-and-lifetimes.html">borrow conflicts</a> · <a href="15-follow-one-example-end-to-end.html">the loop in <code>total</code>, at every layer</a></p>
 
-                    <p>
-                        <b>Next question:</b> Rust's compiler rejects programs
-                        that break these rules.
-                        <a href="14-memory-bugs-and-rust-safety.html"
-                            >What actually goes wrong in the bugs it is
-                            preventing, and which bugs can still happen?</a
-                        >
-                    </p>
-                    <nav class="pager" aria-label="Previous and next">
-                        <a
-                            class="pager__prev"
-                            href="12-references-borrowing-and-lifetimes.html"
-                            rel="prev"
-                            ><span class="pager__dir">← Previous</span
-                            ><span class="pager__q"
-                                >How can code use a value it does not own?</span
-                            ></a
-                        >
-                        <a
-                            class="pager__next"
-                            href="14-memory-bugs-and-rust-safety.html"
-                            rel="next"
-                            ><span class="pager__dir">Next →</span
-                            ><span class="pager__q"
-                                >How do memory bugs happen, and what does Rust
-                                change?</span
-                            ></a
-                        >
-                    </nav>
-                </article>
-                <footer class="foot">
-                    <p>
-                        Observed values, such as addresses, sizes, assembly and
-                        program output, come from one machine. It runs Linux 7.0
-                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
-                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
-                        limit. Addresses change on every run, and other systems,
-                        toolchains and allocators can differ. Details:
-                        <a href="../reference/sources.html">Sources</a> ·
-                        <code>examples/OUTPUT.txt</code>.
-                    </p>
-                </footer>
-            </main>
-            <nav class="otp" aria-label="On this page">
-                <p class="otp__h">On this page</p>
-                <ol class="otp__list">
-                    <li class="lv2">
-                        <a href="#an-iterator-is-its-own-value"
-                            >An iterator is its own value</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a href="#the-three-forms">The three forms</a>
-                    </li>
-                    <li class="lv2">
-                        <a href="#what-examples-iterm-rs-printed"
-                            >What examples/iterm.rs printed</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a href="#after-into-iter-scores-is-gone"
-                            >After into_iter, scores is gone</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a href="#why-a-loop-cannot-push-to-the-vector-it-walks"
-                            >Why a loop cannot push to the vector it walks</a
-                        >
-                    </li>
-                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
-                    <li class="lv2">
-                        <a href="#test-h">Check your understanding</a>
-                    </li>
-                </ol>
-            </nav>
-        </div>
-    </body>
+<p><b>Next question:</b> Rust's compiler rejects programs that break these rules. <a href="14-memory-bugs-and-rust-safety.html">What actually goes wrong in the bugs it is preventing, and which bugs can still happen?</a></p>
+<nav class="pager" aria-label="Previous and next">
+<a class="pager__prev" href="12-references-borrowing-and-lifetimes.html" rel="prev"><span class="pager__dir">← Previous</span><span class="pager__q">How can code use a value it does not own?</span></a>
+<a class="pager__next" href="14-memory-bugs-and-rust-safety.html" rel="next"><span class="pager__dir">Next →</span><span class="pager__q">How do memory bugs happen, and what does Rust change?</span></a>
+</nav>
+</article>
+<footer class="foot"><p>Observed values, such as addresses, sizes, assembly and program output, come from one machine. It runs Linux 7.0 (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack limit. Addresses change on every run, and other systems, toolchains and allocators can differ. Details: <a href="../reference/sources.html">Sources</a> · <code>examples/OUTPUT.txt</code>.</p></footer>
+</main>
+<nav class="otp" aria-label="On this page"><p class="otp__h">On this page</p><ol class="otp__list"><li class="lv2"><a href="#an-iterator-is-its-own-value">An iterator is its own value</a></li><li class="lv2"><a href="#the-three-forms">The three forms</a></li><li class="lv2"><a href="#what-examples-iterm-rs-printed">What examples/iterm.rs printed</a></li><li class="lv2"><a href="#after-into-iter-scores-is-gone">After into_iter, scores is gone</a></li><li class="lv2"><a href="#why-a-loop-cannot-push-to-the-vector-it-walks">Why a loop cannot push to the vector it walks</a></li><li class="lv2"><a href="#keep-h">What to remember</a></li><li class="lv2"><a href="#test-h">Check your understanding</a></li></ol></nav>
+</div>
+</body>
 </html>

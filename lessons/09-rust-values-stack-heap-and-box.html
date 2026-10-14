@@ -1,905 +1,241 @@
 <!doctype html>
 <html lang="en" class="no-js">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>
-            Where does a Rust value live, and what does Box change? — How a Rust
-            program meets the machine
-        </title>
-        <meta
-            name="description"
-            content="Where a Rust value lives: the difference between a binding, a value and the storage under it, what Box&amp;lt;T&amp;gt; adds, and what is guaranteed versus what one build happened to do."
-        />
-        <link rel="stylesheet" href="../assets/css/site.css" />
-        <script src="../assets/js/site.js"></script>
-        <script src="../assets/js/diagrams.js" defer></script>
-    </head>
-    <body>
-        <a class="skip" href="#main">Skip to the text</a>
-        <header class="top">
-            <a class="top__title" href="../index.html"
-                >How a Rust program meets the machine</a
-            >
-            <span class="top__here">09 · Values, stack, heap, Box</span>
-            <span class="top__spacer"></span>
-            <button
-                class="top__btn"
-                type="button"
-                data-toc-toggle
-                aria-expanded="false"
-                aria-controls="toc"
-            >
-                Contents
-            </button>
-        </header>
-        <div class="shell">
-            <nav class="toc" id="toc" aria-label="Contents">
-                <a class="toc__home" href="../index.html">The whole map</a>
-                <p class="toc__group">Before your code runs</p>
-                <ol>
-                    <li>
-                        <a href="01-what-is-a-program.html"
-                            ><span class="n">01</span
-                            ><span>What a program is</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="02-how-a-cpu-runs-code.html"
-                            ><span class="n">02</span
-                            ><span>How a CPU runs code</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="03-programs-processes-and-the-kernel.html"
-                            ><span class="n">03</span
-                            ><span>Processes and the kernel</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Addresses</p>
-                <ol>
-                    <li>
-                        <a href="04-virtual-memory.html"
-                            ><span class="n">04</span
-                            ><span>Inside an address space</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="05-physical-ram-and-address-translation.html"
-                            ><span class="n">05</span
-                            ><span>From virtual address to RAM</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="06-threads-and-their-stacks.html"
-                            ><span class="n">06</span
-                            ><span>Threads and their stacks</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="07-registers-caches-and-a-memory-read.html"
-                            ><span class="n">07</span
-                            ><span>Caches and one load</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Calls and data</p>
-                <ol>
-                    <li>
-                        <a href="08-function-calls-and-stack-frames.html"
-                            ><span class="n">08</span
-                            ><span>Calls and stack frames</span></a
-                        >
-                    </li>
-                    <li>
-                        <a
-                            href="09-rust-values-stack-heap-and-box.html"
-                            aria-current="page"
-                            ><span class="n">09</span
-                            ><span>Values, stack, heap, Box</span></a
-                        >
-                        <ol class="toc__sub">
-                            <li class="lv2">
-                                <a
-                                    href="#three-different-things-binding-value-storage"
-                                    >Three different things: binding, value,
-                                    storage</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a
-                                    href="#the-heap-is-memory-the-allocator-hands-out"
-                                    >The heap is memory the allocator hands
-                                    out</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a
-                                    href="#box-t-one-pointer-that-owns-one-allocation"
-                                    >Box&lt;T&gt;: one pointer that owns one
-                                    allocation</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a
-                                    href="#a-struct-holds-its-fields-a-box-points-away"
-                                    >A struct holds its fields; a box points
-                                    away</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#why-put-something-in-a-box"
-                                    >Why put something in a box?</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#keep-h">What to remember</a>
-                            </li>
-                            <li class="lv2">
-                                <a href="#test-h">Check your understanding</a>
-                            </li>
-                        </ol>
-                    </li>
-                    <li>
-                        <a href="10-string-and-vec-memory.html"
-                            ><span class="n">10</span
-                            ><span>String and Vec</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Rust's rules</p>
-                <ol>
-                    <li>
-                        <a href="11-ownership-moves-clone-and-drop.html"
-                            ><span class="n">11</span
-                            ><span>Ownership, moves, drop</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="12-references-borrowing-and-lifetimes.html"
-                            ><span class="n">12</span
-                            ><span>References and lifetimes</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="13-iterators-and-following-data.html"
-                            ><span class="n">13</span><span>Iterators</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="14-memory-bugs-and-rust-safety.html"
-                            ><span class="n">14</span
-                            ><span>Memory bugs and safety</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">All together</p>
-                <ol>
-                    <li>
-                        <a href="15-follow-one-example-end-to-end.html"
-                            ><span class="n">15</span
-                            ><span>One call, every layer</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Reference</p>
-                <ul class="toc__ref">
-                    <li><a href="../reference/glossary.html">Glossary</a></li>
-                    <li><a href="../reference/sources.html">Sources</a></li>
-                    <li>
-                        <a href="../reference/concept-map.html">Concept map</a>
-                    </li>
-                </ul>
-            </nav>
-            <main id="main">
-                <article class="page">
-                    <header class="opening">
-                        <div class="opening__meta">
-                            <span class="opening__num">09</span
-                            ><span class="tag tag-rust">Rust</span>
-                            <span class="tag tag-comp"
-                                >Compiler &amp; runtime</span
-                            >
-                        </div>
-                        <h1>
-                            Where does a Rust value live, and what does Box
-                            change?
-                        </h1>
-                        <p class="why">
-                            Inside a function, values sit in registers or in the
-                            function's
-                            <a href="08-function-calls-and-stack-frames.html"
-                                >stack frame</a
-                            >, and they are gone when the call returns. Some
-                            values have to outlive the call that made them, or
-                            are too large or too variable in size for a frame.
-                            Those values go on the heap, and a small value in
-                            the frame records where they are.
-                        </p>
-                    </header>
-                    <ul
-                        class="legend"
-                        aria-label="Which layer each colour means"
-                    >
-                        <li><span class="sw sw-rust"></span>Rust language</li>
-                        <li>
-                            <span class="sw sw-comp"></span>Compiler &amp;
-                            runtime library
-                        </li>
-                        <li><span class="sw sw-os"></span>Operating system</li>
-                        <li>
-                            <span class="sw sw-hw"></span>CPU &amp; hardware
-                        </li>
-                    </ul>
-                    <h2 id="three-different-things-binding-value-storage">
-                        Three different things: binding, value, storage
-                    </h2>
-                    <p>
-                        When you write <code>let x = 7;</code>, three separate
-                        things are involved:
-                    </p>
-                    <ul>
-                        <li>
-                            The <b>binding</b> <code>x</code>: a name in your
-                            source code. It exists for the compiler. The running
-                            program has no names.
-                        </li>
-                        <li>
-                            The <b>value</b>: the integer 7, of type
-                            <code>i32</code>, which the Rust rules talk about
-                            <span class="tag tag-rust">Rust</span>.
-                        </li>
-                        <li>
-                            The <b>storage</b>: wherever the compiled program
-                            keeps those 4 bytes while they are needed. That
-                            might be a register or a stack slot. It might be
-                            nowhere at all, if the compiler can fold the value
-                            into an instruction
-                            <span class="tag tag-comp">Compiler</span>.
-                        </li>
-                    </ul>
-                    <p>
-                        Rust's rules are about bindings and values: who owns a
-                        value, who may read it, when it is dropped. They say
-                        very little about storage. "Is <code>x</code> on the
-                        stack?" is a question about one build, not about the
-                        language
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/reference/type-layout.html"
-                            >Reference: type layout</a
-                        >.
-                    </p>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where does a Rust value live, and what does Box change? — How a Rust program meets the machine</title>
+<meta name="description" content="Where a Rust value lives: the difference between a binding, a value and the storage under it, what Box&amp;lt;T&amp;gt; adds, and what is guaranteed versus what one build happened to do.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/diagrams.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the text</a>
+<header class="top">
+  <a class="top__title" href="../index.html">How a Rust program meets the machine</a>
+  <span class="top__here">09 · Values, stack, heap, Box</span>
+  <span class="top__spacer"></span>
+  <button class="top__btn" type="button" data-toc-toggle aria-expanded="false" aria-controls="toc">Contents</button>
+</header>
+<div class="shell">
+<nav class="toc" id="toc" aria-label="Contents">
+<a class="toc__home" href="../index.html">The whole map</a>
+<p class="toc__group">Before your code runs</p><ol>
+<li><a href="01-what-is-a-program.html"><span class="n">01</span><span>What a program is</span></a></li>
+<li><a href="02-how-a-cpu-runs-code.html"><span class="n">02</span><span>How a CPU runs code</span></a></li>
+<li><a href="03-programs-processes-and-the-kernel.html"><span class="n">03</span><span>Processes and the kernel</span></a></li>
+</ol>
+<p class="toc__group">Addresses</p><ol>
+<li><a href="04-virtual-memory.html"><span class="n">04</span><span>Inside an address space</span></a></li>
+<li><a href="05-physical-ram-and-address-translation.html"><span class="n">05</span><span>From virtual address to RAM</span></a></li>
+<li><a href="06-threads-and-their-stacks.html"><span class="n">06</span><span>Threads and their stacks</span></a></li>
+<li><a href="07-registers-caches-and-a-memory-read.html"><span class="n">07</span><span>Caches and one load</span></a></li>
+</ol>
+<p class="toc__group">Calls and data</p><ol>
+<li><a href="08-function-calls-and-stack-frames.html"><span class="n">08</span><span>Calls and stack frames</span></a></li>
+<li><a href="09-rust-values-stack-heap-and-box.html" aria-current="page"><span class="n">09</span><span>Values, stack, heap, Box</span></a><ol class="toc__sub"><li class="lv2"><a href="#three-different-things-binding-value-storage">Three different things: binding, value, storage</a></li><li class="lv2"><a href="#the-heap-is-memory-the-allocator-hands-out">The heap is memory the allocator hands out</a></li><li class="lv2"><a href="#box-t-one-pointer-that-owns-one-allocation">Box&lt;T&gt;: one pointer that owns one allocation</a></li><li class="lv2"><a href="#a-struct-holds-its-fields-a-box-points-away">A struct holds its fields; a box points away</a></li><li class="lv2"><a href="#why-put-something-in-a-box">Why put something in a box?</a></li><li class="lv2"><a href="#keep-h">What to remember</a></li><li class="lv2"><a href="#test-h">Check your understanding</a></li></ol></li>
+<li><a href="10-string-and-vec-memory.html"><span class="n">10</span><span>String and Vec</span></a></li>
+</ol>
+<p class="toc__group">Rust's rules</p><ol>
+<li><a href="11-ownership-moves-clone-and-drop.html"><span class="n">11</span><span>Ownership, moves, drop</span></a></li>
+<li><a href="12-references-borrowing-and-lifetimes.html"><span class="n">12</span><span>References and lifetimes</span></a></li>
+<li><a href="13-iterators-and-following-data.html"><span class="n">13</span><span>Iterators</span></a></li>
+<li><a href="14-memory-bugs-and-rust-safety.html"><span class="n">14</span><span>Memory bugs and safety</span></a></li>
+</ol>
+<p class="toc__group">All together</p><ol>
+<li><a href="15-follow-one-example-end-to-end.html"><span class="n">15</span><span>One call, every layer</span></a></li>
+</ol>
+<p class="toc__group">Reference</p><ul class="toc__ref">
+<li><a href="../reference/glossary.html">Glossary</a></li>
+<li><a href="../reference/sources.html">Sources</a></li>
+<li><a href="../reference/concept-map.html">Concept map</a></li>
+</ul>
+</nav>
+<main id="main">
+<article class="page">
+<header class="opening">
+  <div class="opening__meta"><span class="opening__num">09</span><span class="tag tag-rust">Rust</span> <span class="tag tag-comp">Compiler &amp; runtime</span></div>
+  <h1>Where does a Rust value live, and what does Box change?</h1>
+  <p class="why">Inside a function, values sit in registers or in the function's <a href="08-function-calls-and-stack-frames.html">stack frame</a>, and they are gone when the call returns. Some values have to outlive the call that made them, or are too large or too variable in size for a frame. Those values go on the heap, and a small value in the frame records where they are.</p>
+</header>
+<ul class="legend" aria-label="Which layer each colour means"><li><span class="sw sw-rust"></span>Rust language</li><li><span class="sw sw-comp"></span>Compiler &amp; runtime library</li><li><span class="sw sw-os"></span>Operating system</li><li><span class="sw sw-hw"></span>CPU &amp; hardware</li></ul>
+<h2 id="three-different-things-binding-value-storage">Three different things: binding, value, storage</h2>
+<p>When you write <code>let x = 7;</code>, three separate things are involved:</p>
+<ul>
+  <li>The <b>binding</b> <code>x</code>: a name in your source code. It exists for the compiler. The running program has no names.</li>
+  <li>The <b>value</b>: the integer 7, of type <code>i32</code>, which the Rust rules talk about <span class="tag tag-rust">Rust</span>.</li>
+  <li>The <b>storage</b>: wherever the compiled program keeps those 4 bytes while they are needed. That might be a register or a stack slot. It might be nowhere at all, if the compiler can fold the value into an instruction <span class="tag tag-comp">Compiler</span>.</li>
+</ul>
+<p>
+  Rust's rules are about bindings and values: who owns a value, who may read it, when it is dropped. They say very little about storage. "Is <code>x</code> on the stack?" is a question about one build, not about the language <a class="src" href="https://doc.rust-lang.org/reference/type-layout.html">Reference: type layout</a>.
+</p>
 
-                    <h2 id="the-heap-is-memory-the-allocator-hands-out">
-                        The heap is memory the allocator hands out
-                    </h2>
-                    <p>
-                        A frame lasts as long as its call. A value that has to
-                        outlive the call, or whose size is only known at run
-                        time, needs memory that is handed out and given back on
-                        request. That memory is the
-                        <span class="term">heap</span>, and the code that hands
-                        it out is an
-                        <a
-                            href="https://en.wikipedia.org/wiki/Memory_management#Manual_memory_management"
-                            class="ext"
-                            >allocator</a
-                        >. Here "heap" only means a pool of memory handed out on
-                        request. It is unrelated to the
-                        <a
-                            href="https://en.wikipedia.org/wiki/Heap_(data_structure)"
-                            class="ext"
-                            >heap data structure</a
-                        >
-                        of the same name.
-                    </p>
-                    <p>
-                        Rust has no memory of its own. The standard library uses
-                        one <span class="term">global allocator</span> for
-                        <code>Box</code>, <code>Vec</code>,
-                        <code>String</code> and the rest
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/std/alloc/index.html"
-                            >std::alloc</a
-                        >
-                        <span class="tag tag-comp">Runtime library</span>. Which
-                        allocator that is by default is not specified.
-                    </p>
-                    <p>
-                        On this Linux machine it behaved like the C library's
-                        <code>malloc</code>. Blocks came from the region marked
-                        <code>[heap]</code> in the process's
-                        <a href="04-virtual-memory.html">memory map</a>
-                        (<code>/proc/self/maps</code>). The C library got that
-                        region from the kernel
-                        <span class="tag tag-os">OS</span>
-                        <a
-                            class="src"
-                            href="https://man7.org/linux/man-pages/man3/malloc.3.html"
-                            >malloc(3)</a
-                        >.
-                    </p>
+<h2 id="the-heap-is-memory-the-allocator-hands-out">The heap is memory the allocator hands out</h2>
+<p>
+  A frame lasts as long as its call. A value that has to outlive the call, or whose size is only known at run time, needs memory that is handed out and given back on request. That memory is the <span class="term">heap</span>, and the code that hands it out is an <a href="https://en.wikipedia.org/wiki/Memory_management#Manual_memory_management" class="ext">allocator</a>. Here "heap" only means a pool of memory handed out on request. It is unrelated to the <a href="https://en.wikipedia.org/wiki/Heap_(data_structure)" class="ext">heap data structure</a> of the same name.
+</p>
+<p>
+  Rust has no memory of its own. The standard library uses one <span class="term">global allocator</span> for <code>Box</code>, <code>Vec</code>, <code>String</code> and the rest <a class="src" href="https://doc.rust-lang.org/std/alloc/index.html">std::alloc</a> <span class="tag tag-comp">Runtime library</span>. Which allocator that is by default is not specified.
+</p>
+<p>
+  On this Linux machine it behaved like the C library's <code>malloc</code>. Blocks came from the region marked <code>[heap]</code> in the process's <a href="04-virtual-memory.html">memory map</a> (<code>/proc/self/maps</code>). The C library got that region from the kernel <span class="tag tag-os">OS</span> <a class="src" href="https://man7.org/linux/man-pages/man3/malloc.3.html">malloc(3)</a>.
+</p>
 
-                    <h2 id="box-t-one-pointer-that-owns-one-allocation">
-                        <code>Box&lt;T&gt;</code>: one pointer that owns one
-                        allocation
-                    </h2>
-                    <p>
-                        <code>Box::new(7)</code> "allocates memory on the heap
-                        and then places <code>x</code> into it"
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/std/boxed/struct.Box.html#method.new"
-                            >Box::new</a
-                        >. What you get back is the box itself: a pointer to
-                        that allocation. For a sized type, a
-                        <code>Box&lt;T&gt;</code> "is guaranteed to be
-                        represented as a single pointer"
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/std/boxed/index.html#memory-layout"
-                            >std::boxed</a
-                        >, which is 8 bytes on x86-64. The box <em>owns</em> the
-                        allocation: when the box is dropped, the 7 is dropped
-                        and the memory is given back to the allocator.
-                    </p>
-                    <p>
-                        Here are three small values, each split into the four
-                        parts above:
-                    </p>
+<h2 id="box-t-one-pointer-that-owns-one-allocation"><code>Box&lt;T&gt;</code>: one pointer that owns one allocation</h2>
+<p>
+  <code>Box::new(7)</code> "allocates memory on the heap and then places <code>x</code> into it" <a class="src" href="https://doc.rust-lang.org/std/boxed/struct.Box.html#method.new">Box::new</a>. What you get back is the box itself: a pointer to that allocation. For a sized type, a <code>Box&lt;T&gt;</code> "is guaranteed to be represented as a single pointer" <a class="src" href="https://doc.rust-lang.org/std/boxed/index.html#memory-layout">std::boxed</a>, which is 8 bytes on x86-64. The box <em>owns</em> the allocation: when the box is dropped, the 7 is dropped and the memory is given back to the allocator.
+</p>
+<p>Here are three small values, each split into the four parts above:</p>
 
-                    <div class="codeblock">
-                        <div class="codeblock__label">
-                            <span
-                                ><code>examples/boxes.rs</code>
-                                (shortened)</span
-                            >
-                        </div>
-                        <pre><code><span class="k">struct</span> Pair { id: i32, score: Box&lt;i32&gt; }
+<div class="codeblock">
+  <div class="codeblock__label"><span><code>examples/boxes.rs</code> (shortened)</span></div>
+<pre><code><span class="k">struct</span> Pair { id: i32, score: Box&lt;i32&gt; }
 
 <span class="k">let</span> x = 7;
 <span class="k">let</span> b = Box::new(7);
 <span class="k">let</span> p = Pair { id: 1, score: Box::new(90) };</code></pre>
-                    </div>
+</div>
 
-                    <figure
-                        class="fig"
-                        data-fig="bv"
-                        data-label="binding and storage diagram"
-                    >
-                        <div class="fig__head">
-                            <p class="fig__title">
-                                Binding, value, storage, heap
-                            </p>
-                            <span class="fig__kind"
-                                >Guaranteed parts marked · addresses from one
-                                run</span
-                            >
-                        </div>
-                        <div class="controls">
-                            <span class="controls__label">Example</span>
-                            <div class="seg" data-choice="ex">
-                                <button
-                                    class="btn"
-                                    type="button"
-                                    data-value="x"
-                                    aria-pressed="true"
-                                >
-                                    <code>x = 7</code>
-                                </button>
-                                <button
-                                    class="btn"
-                                    type="button"
-                                    data-value="b"
-                                >
-                                    <code>Box</code>
-                                </button>
-                                <button
-                                    class="btn"
-                                    type="button"
-                                    data-value="p"
-                                >
-                                    <code>Pair</code>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="fig__grid fig__grid--note">
-                            <div class="fig__body">
-                                <div class="bv-ex" data-ex="x">
-                                    <p class="bv-ex__h">let x = 7;</p>
-                                    <div class="bv">
-                                        <div class="bv__col">
-                                            <h5>Binding</h5>
-                                            <div class="bv__box">
-                                                <code>x: i32</code>
-                                            </div>
-                                        </div>
-                                        <div class="bv__col">
-                                            <h5>Rust value</h5>
-                                            <div class="bv__box">
-                                                the integer 7<br /><span
-                                                    class="badge badge--sure"
-                                                    >i32 is 4 bytes:
-                                                    guaranteed</span
-                                                >
-                                            </div>
-                                        </div>
-                                        <div class="bv__col">
-                                            <h5>
-                                                Possible storage
-                                                <span class="tag tag-comp"
-                                                    >Compiler</span
-                                                >
-                                            </h5>
-                                            <div class="bv__box bv__box--maybe">
-                                                4 bytes in <code>main</code>'s
-                                                frame<span class="addr"
-                                                    >0x7ffc761a31d4 ·
-                                                    [stack]</span
-                                                ><span
-                                                    class="badge badge--maybe"
-                                                    >this run, because the
-                                                    address was printed</span
-                                                >
-                                            </div>
-                                            <div class="bv__box bv__box--maybe">
-                                                or only a register, or folded
-                                                into an instruction<span
-                                                    class="badge badge--maybe"
-                                                    >what optimised code often
-                                                    does</span
-                                                >
-                                            </div>
-                                        </div>
-                                        <div class="bv__col">
-                                            <h5>Heap allocation</h5>
-                                            <div class="bv__none">
-                                                None. Nothing is allocated for
-                                                <code>x</code>.
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+<figure class="fig" data-fig="bv" data-label="binding and storage diagram">
+  <div class="fig__head">
+    <p class="fig__title">Binding, value, storage, heap</p>
+    <span class="fig__kind">Guaranteed parts marked · addresses from one run</span>
+  </div>
+  <div class="controls">
+    <span class="controls__label">Example</span>
+    <div class="seg" data-choice="ex">
+      <button class="btn" type="button" data-value="x" aria-pressed="true"><code>x = 7</code></button>
+      <button class="btn" type="button" data-value="b"><code>Box</code></button>
+      <button class="btn" type="button" data-value="p"><code>Pair</code></button>
+    </div>
+  </div>
+  <div class="fig__grid fig__grid--note">
+    <div class="fig__body">
 
-                                <div class="bv-ex" data-ex="b">
-                                    <p class="bv-ex__h">let b = Box::new(7);</p>
-                                    <div class="bv">
-                                        <div class="bv__col">
-                                            <h5>Binding</h5>
-                                            <div class="bv__box">
-                                                <code>b: Box&lt;i32&gt;</code>
-                                            </div>
-                                        </div>
-                                        <div class="bv__col">
-                                            <h5>Rust value</h5>
-                                            <div class="bv__box">
-                                                a box that owns one heap
-                                                <code>i32</code>, holding 7<br /><span
-                                                    class="badge badge--sure"
-                                                    >owns the allocation:
-                                                    guaranteed</span
-                                                >
-                                            </div>
-                                        </div>
-                                        <div class="bv__col">
-                                            <h5>
-                                                Possible storage
-                                                <span class="tag tag-comp"
-                                                    >Compiler</span
-                                                >
-                                            </h5>
-                                            <div class="bv__box bv__box--maybe">
-                                                8 bytes in <code>main</code>'s
-                                                frame<span class="addr"
-                                                    >0x7ffc761a3218 ·
-                                                    [stack]</span
-                                                ><span class="badge badge--sure"
-                                                    >one pointer:
-                                                    guaranteed</span
-                                                >
-                                                <span class="badge badge--maybe"
-                                                    >where: this run</span
-                                                >
-                                                <div class="bv__fields">
-                                                    <span
-                                                        class="p4 bv__ptr"
-                                                        data-ptr="heap-b"
-                                                        >pointer</span
-                                                    >
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="bv__col">
-                                            <h5>
-                                                Heap allocation
-                                                <span class="tag tag-comp"
-                                                    >Allocator</span
-                                                >
-                                            </h5>
-                                            <div
-                                                class="bv__box bv__box--heap"
-                                                id="heap-b"
-                                            >
-                                                4 bytes: <b>7</b
-                                                ><span class="addr"
-                                                    >0x57f870efdd50 ·
-                                                    [heap]</span
-                                                ><span class="badge badge--sure"
-                                                    >allocated by Box::new:
-                                                    guaranteed</span
-                                                >
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="bv-ex" data-ex="p">
-                                    <p class="bv-ex__h">
-                                        let p = Pair { id: 1, score:
-                                        Box::new(90) };
-                                    </p>
-                                    <div class="bv">
-                                        <div class="bv__col">
-                                            <h5>Binding</h5>
-                                            <div class="bv__box">
-                                                <code>p: Pair</code>
-                                            </div>
-                                        </div>
-                                        <div class="bv__col">
-                                            <h5>Rust value</h5>
-                                            <div class="bv__box">
-                                                one <code>Pair</code> whose
-                                                fields are <code>id</code> = 1
-                                                and <code>score</code>, a box
-                                                holding 90<br /><span
-                                                    class="badge badge--sure"
-                                                    >fields are inside the
-                                                    struct: guaranteed</span
-                                                >
-                                            </div>
-                                        </div>
-                                        <div class="bv__col">
-                                            <h5>
-                                                Possible storage
-                                                <span class="tag tag-comp"
-                                                    >Compiler</span
-                                                >
-                                            </h5>
-                                            <div class="bv__box bv__box--maybe">
-                                                16 bytes in <code>main</code>'s
-                                                frame<span class="addr"
-                                                    >0x7ffc761a3220 ·
-                                                    [stack]</span
-                                                >
-                                                <span class="badge badge--maybe"
-                                                    >field order and padding:
-                                                    chosen by the compiler</span
-                                                >
-                                                <div class="bv__fields">
-                                                    <span>id</span
-                                                    ><span class="pad">pad</span
-                                                    ><span
-                                                        class="p2 bv__ptr"
-                                                        data-ptr="heap-p"
-                                                        >score ptr</span
-                                                    >
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="bv__col">
-                                            <h5>
-                                                Heap allocation
-                                                <span class="tag tag-comp"
-                                                    >Allocator</span
-                                                >
-                                            </h5>
-                                            <div
-                                                class="bv__box bv__box--heap"
-                                                id="heap-p"
-                                            >
-                                                4 bytes: <b>90</b
-                                                ><span class="addr"
-                                                    >0x57f870efdd70 ·
-                                                    [heap]</span
-                                                ><span class="badge badge--sure"
-                                                    >owned by p.score</span
-                                                >
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <aside class="leaves-out">
-                                <h4>What this picture leaves out</h4>
-                                <ul>
-                                    <li>
-                                        The allocator's own bookkeeping. The two
-                                        heap blocks are 0x20 bytes apart
-                                        although each holds 4 bytes: glibc
-                                        rounds small requests up and keeps a
-                                        header with each block.
-                                    </li>
-                                    <li>
-                                        Alignment rules, which decide where
-                                        padding goes.
-                                    </li>
-                                    <li>
-                                        That printing an address forces the
-                                        value into memory. Without the
-                                        <code>println!</code> calls, the
-                                        optimiser might keep <code>x</code> and
-                                        the pointers in registers only.
-                                    </li>
-                                    <li>
-                                        Boxes of zero-sized types, which do not
-                                        allocate.
-                                    </li>
-                                </ul>
-                            </aside>
-                        </div>
-                    </figure>
-
-                    <p>
-                        The numbers under the boxes come from one run of
-                        <code>examples/boxes.rs</code>, which looks each address
-                        up in <code>/proc/self/maps</code>
-                        <a
-                            class="src"
-                            href="https://man7.org/linux/man-pages/man5/proc_pid_maps.5.html"
-                            >proc_pid_maps(5)</a
-                        >. The program also printed
-                        <code>size_of::&lt;Box&lt;i32&gt;&gt;() = 8</code> and
-                        <code>size_of::&lt;Pair&gt;() = 16</code>. The 16 bytes
-                        are 8 for the pointer, 4 for <code>id</code>, and 4 of
-                        padding. The padding makes the next <code>Pair</code> in
-                        an array start on an 8-byte boundary.
-                    </p>
-
-                    <h2 id="a-struct-holds-its-fields-a-box-points-away">
-                        A struct holds its fields; a box points away
-                    </h2>
-                    <p>
-                        A <code>Pair</code> does not point to its
-                        <code>id</code>. The 4 bytes of <code>id</code> are
-                        inside the 16 bytes of <code>Pair</code>, wherever those
-                        are. Only <code>score</code> leads elsewhere, because
-                        its type is a box. In the default representation the
-                        compiler chooses the order of the fields and the
-                        padding; the order you wrote is not promised
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/reference/type-layout.html#the-rust-representation"
-                            >Reference: the Rust representation</a
-                        >.
-                    </p>
-                    <p>
-                        This difference matters when a value
-                        <a href="11-ownership-moves-clone-and-drop.html"
-                            >moves</a
-                        >. Moving <code>p</code> to another binding copies its
-                        16 bytes, including the 8-byte pointer; the 90 on the
-                        heap stays exactly where it is.
-                    </p>
-
-                    <h2 id="why-put-something-in-a-box">
-                        Why put something in a box?
-                    </h2>
-                    <ul>
-                        <li>
-                            The size is not known when compiling: a recursive
-                            type such as a tree node that contains another node,
-                            or a <code>Box&lt;dyn Trait&gt;</code>.
-                        </li>
-                        <li>
-                            The value is large and you want moves to copy one
-                            pointer instead of the whole value.
-                        </li>
-                        <li>
-                            The value should outlive the function that created
-                            it, without being returned by copy.
-                        </li>
-                    </ul>
-                    <p>
-                        "Heap" does not mean "long-lived". A box made in a loop
-                        and dropped at the end of each iteration lives a few
-                        nanoseconds. The heap is a way of getting memory with an
-                        owner that decides when it is given back, not a promise
-                        about how long that is.
-                    </p>
-
-                    <div class="aside aside--wrong">
-                        <p class="aside__h">
-                            Three tempting pictures that are wrong
-                        </p>
-                        <p>
-                            "Rust has its own memory." It uses the process's
-                            address space through an allocator, like any other
-                            program.
-                        </p>
-                        <p>
-                            "Every local is on the stack." A local might be on
-                            the stack, in a register, or nowhere. Its
-                            <em>owner</em> is the binding; its storage is the
-                            compiler's choice.
-                        </p>
-                        <p>
-                            "A box is on the heap." The box, the 8-byte pointer,
-                            sits wherever the binding's storage is. What it
-                            points to is on the heap.
-                        </p>
-                    </div>
-
-                    <section class="keep" aria-labelledby="keep-h">
-                        <h2 id="keep-h">What to remember</h2>
-                        <ol>
-                            <li>
-                                A binding is a name, a value is what Rust's
-                                rules talk about, and storage is the compiler's
-                                choice.
-                            </li>
-                            <li>
-                                Heap memory comes from the global allocator,
-                                which gets it from the operating system.
-                            </li>
-                            <li>
-                                A <code>Box&lt;T&gt;</code> is one pointer that
-                                owns one heap allocation; dropping the box frees
-                                it.
-                            </li>
-                        </ol>
-                    </section>
-
-                    <section class="test" aria-labelledby="test-h">
-                        <h2 id="test-h">Check your understanding</h2>
-                        <details>
-                            <summary>
-                                How many heap allocations does
-                                <code
-                                    >let p = Pair { id: 1, score: Box::new(90)
-                                    };</code
-                                >
-                                make?
-                            </summary>
-                            <div>
-                                <p>
-                                    One, for the 90. The
-                                    <code>Pair</code> itself, including
-                                    <code>id</code> and the pointer, is stored
-                                    wherever <code>p</code> is stored.
-                                </p>
-                            </div>
-                        </details>
-                        <details>
-                            <summary>
-                                Can you rely on <code>id</code> being the first
-                                4 bytes of a <code>Pair</code>?
-                            </summary>
-                            <div>
-                                <p>
-                                    No. With the default representation the
-                                    field order is not guaranteed.
-                                    <code>#[repr(C)]</code> fixes it, for code
-                                    that needs that.
-                                </p>
-                            </div>
-                        </details>
-                        <details>
-                            <summary>
-                                Is a <code>Box&lt;i32&gt;</code> 4 bytes or 8 on
-                                x86-64?
-                            </summary>
-                            <div>
-                                <p>
-                                    8: it is a pointer. The <code>i32</code> it
-                                    points to is 4 bytes, in a separate heap
-                                    block.
-                                </p>
-                            </div>
-                        </details>
-                    </section>
-
-                    <p class="related">
-                        <b>Related:</b>
-                        <a href="04-virtual-memory.html"
-                            >where <code>[heap]</code> and the stack are in the
-                            address space</a
-                        >
-                        ·
-                        <a href="08-function-calls-and-stack-frames.html"
-                            >frames</a
-                        >
-                        ·
-                        <a href="10-string-and-vec-memory.html"
-                            >a handle with a growable buffer</a
-                        >
-                        ·
-                        <a href="11-ownership-moves-clone-and-drop.html"
-                            >who frees the allocation</a
-                        >
-                    </p>
-
-                    <p>
-                        <b>Next question:</b> a box points to one value of a
-                        fixed size.
-                        <a href="10-string-and-vec-memory.html"
-                            >What does a <code>Vec</code> hold so that it can
-                            grow?</a
-                        >
-                    </p>
-                    <nav class="pager" aria-label="Previous and next">
-                        <a
-                            class="pager__prev"
-                            href="08-function-calls-and-stack-frames.html"
-                            rel="prev"
-                            ><span class="pager__dir">← Previous</span
-                            ><span class="pager__q"
-                                >What happens on the stack when one function
-                                calls another?</span
-                            ></a
-                        >
-                        <a
-                            class="pager__next"
-                            href="10-string-and-vec-memory.html"
-                            rel="next"
-                            ><span class="pager__dir">Next →</span
-                            ><span class="pager__q"
-                                >What is a Vec made of, and what happens when it
-                                grows?</span
-                            ></a
-                        >
-                    </nav>
-                </article>
-                <footer class="foot">
-                    <p>
-                        Observed values, such as addresses, sizes, assembly and
-                        program output, come from one machine. It runs Linux 7.0
-                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
-                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
-                        limit. Addresses change on every run, and other systems,
-                        toolchains and allocators can differ. Details:
-                        <a href="../reference/sources.html">Sources</a> ·
-                        <code>examples/OUTPUT.txt</code>.
-                    </p>
-                </footer>
-            </main>
-            <nav class="otp" aria-label="On this page">
-                <p class="otp__h">On this page</p>
-                <ol class="otp__list">
-                    <li class="lv2">
-                        <a href="#three-different-things-binding-value-storage"
-                            >Three different things: binding, value, storage</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a href="#the-heap-is-memory-the-allocator-hands-out"
-                            >The heap is memory the allocator hands out</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a href="#box-t-one-pointer-that-owns-one-allocation"
-                            >Box&lt;T&gt;: one pointer that owns one
-                            allocation</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a href="#a-struct-holds-its-fields-a-box-points-away"
-                            >A struct holds its fields; a box points away</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a href="#why-put-something-in-a-box"
-                            >Why put something in a box?</a
-                        >
-                    </li>
-                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
-                    <li class="lv2">
-                        <a href="#test-h">Check your understanding</a>
-                    </li>
-                </ol>
-            </nav>
+      <div class="bv-ex" data-ex="x">
+        <p class="bv-ex__h">let x = 7;</p>
+        <div class="bv">
+          <div class="bv__col"><h5>Binding</h5><div class="bv__box"><code>x: i32</code></div></div>
+          <div class="bv__col"><h5>Rust value</h5><div class="bv__box">the integer 7<br><span class="badge badge--sure">i32 is 4 bytes: guaranteed</span></div></div>
+          <div class="bv__col"><h5>Possible storage <span class="tag tag-comp">Compiler</span></h5>
+            <div class="bv__box bv__box--maybe">4 bytes in <code>main</code>'s frame<span class="addr">0x7ffc761a31d4 · [stack]</span><span class="badge badge--maybe">this run, because the address was printed</span></div>
+            <div class="bv__box bv__box--maybe">or only a register, or folded into an instruction<span class="badge badge--maybe">what optimised code often does</span></div>
+          </div>
+          <div class="bv__col"><h5>Heap allocation</h5><div class="bv__none">None. Nothing is allocated for <code>x</code>.</div></div>
         </div>
-    </body>
+      </div>
+
+      <div class="bv-ex" data-ex="b">
+        <p class="bv-ex__h">let b = Box::new(7);</p>
+        <div class="bv">
+          <div class="bv__col"><h5>Binding</h5><div class="bv__box"><code>b: Box&lt;i32&gt;</code></div></div>
+          <div class="bv__col"><h5>Rust value</h5><div class="bv__box">a box that owns one heap <code>i32</code>, holding 7<br><span class="badge badge--sure">owns the allocation: guaranteed</span></div></div>
+          <div class="bv__col"><h5>Possible storage <span class="tag tag-comp">Compiler</span></h5>
+            <div class="bv__box bv__box--maybe">8 bytes in <code>main</code>'s frame<span class="addr">0x7ffc761a3218 · [stack]</span><span class="badge badge--sure">one pointer: guaranteed</span> <span class="badge badge--maybe">where: this run</span>
+              <div class="bv__fields"><span class="p4 bv__ptr" data-ptr="heap-b">pointer</span></div>
+            </div>
+          </div>
+          <div class="bv__col"><h5>Heap allocation <span class="tag tag-comp">Allocator</span></h5>
+            <div class="bv__box bv__box--heap" id="heap-b">4 bytes: <b>7</b><span class="addr">0x57f870efdd50 · [heap]</span><span class="badge badge--sure">allocated by Box::new: guaranteed</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bv-ex" data-ex="p">
+        <p class="bv-ex__h">let p = Pair { id: 1, score: Box::new(90) };</p>
+        <div class="bv">
+          <div class="bv__col"><h5>Binding</h5><div class="bv__box"><code>p: Pair</code></div></div>
+          <div class="bv__col"><h5>Rust value</h5><div class="bv__box">one <code>Pair</code> whose fields are <code>id</code> = 1 and <code>score</code>, a box holding 90<br><span class="badge badge--sure">fields are inside the struct: guaranteed</span></div></div>
+          <div class="bv__col"><h5>Possible storage <span class="tag tag-comp">Compiler</span></h5>
+            <div class="bv__box bv__box--maybe">16 bytes in <code>main</code>'s frame<span class="addr">0x7ffc761a3220 · [stack]</span>
+              <span class="badge badge--maybe">field order and padding: chosen by the compiler</span>
+              <div class="bv__fields"><span>id</span><span class="pad">pad</span><span class="p2 bv__ptr" data-ptr="heap-p">score ptr</span></div>
+            </div>
+          </div>
+          <div class="bv__col"><h5>Heap allocation <span class="tag tag-comp">Allocator</span></h5>
+            <div class="bv__box bv__box--heap" id="heap-p">4 bytes: <b>90</b><span class="addr">0x57f870efdd70 · [heap]</span><span class="badge badge--sure">owned by p.score</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <aside class="leaves-out">
+      <h4>What this picture leaves out</h4>
+      <ul>
+        <li>The allocator's own bookkeeping. The two heap blocks are 0x20 bytes apart although each holds 4 bytes: glibc rounds small requests up and keeps a header with each block.</li>
+        <li>Alignment rules, which decide where padding goes.</li>
+        <li>That printing an address forces the value into memory. Without the <code>println!</code> calls, the optimiser might keep <code>x</code> and the pointers in registers only.</li>
+        <li>Boxes of zero-sized types, which do not allocate.</li>
+      </ul>
+    </aside>
+  </div>
+</figure>
+
+<p>
+  The numbers under the boxes come from one run of <code>examples/boxes.rs</code>, which looks each address up in <code>/proc/self/maps</code> <a class="src" href="https://man7.org/linux/man-pages/man5/proc_pid_maps.5.html">proc_pid_maps(5)</a>. The program also printed <code>size_of::&lt;Box&lt;i32&gt;&gt;() = 8</code> and <code>size_of::&lt;Pair&gt;() = 16</code>. The 16 bytes are 8 for the pointer, 4 for <code>id</code>, and 4 of padding. The padding makes the next <code>Pair</code> in an array start on an 8-byte boundary.
+</p>
+
+<h2 id="a-struct-holds-its-fields-a-box-points-away">A struct holds its fields; a box points away</h2>
+<p>
+  A <code>Pair</code> does not point to its <code>id</code>. The 4 bytes of <code>id</code> are inside the 16 bytes of <code>Pair</code>, wherever those are. Only <code>score</code> leads elsewhere, because its type is a box. In the default representation the compiler chooses the order of the fields and the padding; the order you wrote is not promised <a class="src" href="https://doc.rust-lang.org/reference/type-layout.html#the-rust-representation">Reference: the Rust representation</a>.
+</p>
+<p>
+  This difference matters when a value <a href="11-ownership-moves-clone-and-drop.html">moves</a>. Moving <code>p</code> to another binding copies its 16 bytes, including the 8-byte pointer; the 90 on the heap stays exactly where it is.
+</p>
+
+<h2 id="why-put-something-in-a-box">Why put something in a box?</h2>
+<ul>
+  <li>The size is not known when compiling: a recursive type such as a tree node that contains another node, or a <code>Box&lt;dyn Trait&gt;</code>.</li>
+  <li>The value is large and you want moves to copy one pointer instead of the whole value.</li>
+  <li>The value should outlive the function that created it, without being returned by copy.</li>
+</ul>
+<p>
+  "Heap" does not mean "long-lived". A box made in a loop and dropped at the end of each iteration lives a few nanoseconds. The heap is a way of getting memory with an owner that decides when it is given back, not a promise about how long that is.
+</p>
+
+<div class="aside aside--wrong">
+  <p class="aside__h">Three tempting pictures that are wrong</p>
+  <p>"Rust has its own memory." It uses the process's address space through an allocator, like any other program.</p>
+  <p>"Every local is on the stack." A local might be on the stack, in a register, or nowhere. Its <em>owner</em> is the binding; its storage is the compiler's choice.</p>
+  <p>"A box is on the heap." The box, the 8-byte pointer, sits wherever the binding's storage is. What it points to is on the heap.</p>
+</div>
+
+<section class="keep" aria-labelledby="keep-h">
+  <h2 id="keep-h">What to remember</h2>
+  <ol>
+    <li>A binding is a name, a value is what Rust's rules talk about, and storage is the compiler's choice.</li>
+    <li>Heap memory comes from the global allocator, which gets it from the operating system.</li>
+    <li>A <code>Box&lt;T&gt;</code> is one pointer that owns one heap allocation; dropping the box frees it.</li>
+  </ol>
+</section>
+
+<section class="test" aria-labelledby="test-h">
+  <h2 id="test-h">Check your understanding</h2>
+  <details>
+    <summary>How many heap allocations does <code>let p = Pair { id: 1, score: Box::new(90) };</code> make?</summary>
+    <div><p>One, for the 90. The <code>Pair</code> itself, including <code>id</code> and the pointer, is stored wherever <code>p</code> is stored.</p></div>
+  </details>
+  <details>
+    <summary>Can you rely on <code>id</code> being the first 4 bytes of a <code>Pair</code>?</summary>
+    <div><p>No. With the default representation the field order is not guaranteed. <code>#[repr(C)]</code> fixes it, for code that needs that.</p></div>
+  </details>
+  <details>
+    <summary>Is a <code>Box&lt;i32&gt;</code> 4 bytes or 8 on x86-64?</summary>
+    <div><p>8: it is a pointer. The <code>i32</code> it points to is 4 bytes, in a separate heap block.</p></div>
+  </details>
+</section>
+
+<p class="related"><b>Related:</b> <a href="04-virtual-memory.html">where <code>[heap]</code> and the stack are in the address space</a> · <a href="08-function-calls-and-stack-frames.html">frames</a> · <a href="10-string-and-vec-memory.html">a handle with a growable buffer</a> · <a href="11-ownership-moves-clone-and-drop.html">who frees the allocation</a></p>
+
+<p><b>Next question:</b> a box points to one value of a fixed size. <a href="10-string-and-vec-memory.html">What does a <code>Vec</code> hold so that it can grow?</a></p>
+<nav class="pager" aria-label="Previous and next">
+<a class="pager__prev" href="08-function-calls-and-stack-frames.html" rel="prev"><span class="pager__dir">← Previous</span><span class="pager__q">What happens on the stack when one function calls another?</span></a>
+<a class="pager__next" href="10-string-and-vec-memory.html" rel="next"><span class="pager__dir">Next →</span><span class="pager__q">What is a Vec made of, and what happens when it grows?</span></a>
+</nav>
+</article>
+<footer class="foot"><p>Observed values, such as addresses, sizes, assembly and program output, come from one machine. It runs Linux 7.0 (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack limit. Addresses change on every run, and other systems, toolchains and allocators can differ. Details: <a href="../reference/sources.html">Sources</a> · <code>examples/OUTPUT.txt</code>.</p></footer>
+</main>
+<nav class="otp" aria-label="On this page"><p class="otp__h">On this page</p><ol class="otp__list"><li class="lv2"><a href="#three-different-things-binding-value-storage">Three different things: binding, value, storage</a></li><li class="lv2"><a href="#the-heap-is-memory-the-allocator-hands-out">The heap is memory the allocator hands out</a></li><li class="lv2"><a href="#box-t-one-pointer-that-owns-one-allocation">Box&lt;T&gt;: one pointer that owns one allocation</a></li><li class="lv2"><a href="#a-struct-holds-its-fields-a-box-points-away">A struct holds its fields; a box points away</a></li><li class="lv2"><a href="#why-put-something-in-a-box">Why put something in a box?</a></li><li class="lv2"><a href="#keep-h">What to remember</a></li><li class="lv2"><a href="#test-h">Check your understanding</a></li></ol></nav>
+</div>
+</body>
 </html>

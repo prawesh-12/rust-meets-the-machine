@@ -1,268 +1,78 @@
 <!doctype html>
 <html lang="en" class="no-js">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>
-            What is inside a process&#x27;s address space? — How a Rust program
-            meets the machine
-        </title>
-        <meta
-            name="description"
-            content="What a process&#x27;s virtual address space contains: code, data, the heap, anonymous mappings, shared libraries and thread stacks, shown with the real memory map of a running Rust program on Linux."
-        />
-        <link rel="stylesheet" href="../assets/css/site.css" />
-        <script src="../assets/js/site.js"></script>
-        <script src="../assets/js/diagrams.js" defer></script>
-    </head>
-    <body>
-        <a class="skip" href="#main">Skip to the text</a>
-        <header class="top">
-            <a class="top__title" href="../index.html"
-                >How a Rust program meets the machine</a
-            >
-            <span class="top__here">04 · Inside an address space</span>
-            <span class="top__spacer"></span>
-            <button
-                class="top__btn"
-                type="button"
-                data-toc-toggle
-                aria-expanded="false"
-                aria-controls="toc"
-            >
-                Contents
-            </button>
-        </header>
-        <div class="shell">
-            <nav class="toc" id="toc" aria-label="Contents">
-                <a class="toc__home" href="../index.html">The whole map</a>
-                <p class="toc__group">Before your code runs</p>
-                <ol>
-                    <li>
-                        <a href="01-what-is-a-program.html"
-                            ><span class="n">01</span
-                            ><span>What a program is</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="02-how-a-cpu-runs-code.html"
-                            ><span class="n">02</span
-                            ><span>How a CPU runs code</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="03-programs-processes-and-the-kernel.html"
-                            ><span class="n">03</span
-                            ><span>Processes and the kernel</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Addresses</p>
-                <ol>
-                    <li>
-                        <a href="04-virtual-memory.html" aria-current="page"
-                            ><span class="n">04</span
-                            ><span>Inside an address space</span></a
-                        >
-                        <ol class="toc__sub">
-                            <li class="lv2">
-                                <a href="#a-real-map">A real map</a>
-                            </li>
-                            <li class="lv2">
-                                <a href="#reading-the-map">Reading the map</a>
-                            </li>
-                            <li class="lv2">
-                                <a href="#mapped-is-not-the-same-as-in-ram"
-                                    >Mapped is not the same as in RAM</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#who-decides-the-layout"
-                                    >Who decides the layout?</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#keep-h">What to remember</a>
-                            </li>
-                            <li class="lv2">
-                                <a href="#test-h">Check your understanding</a>
-                            </li>
-                        </ol>
-                    </li>
-                    <li>
-                        <a href="05-physical-ram-and-address-translation.html"
-                            ><span class="n">05</span
-                            ><span>From virtual address to RAM</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="06-threads-and-their-stacks.html"
-                            ><span class="n">06</span
-                            ><span>Threads and their stacks</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="07-registers-caches-and-a-memory-read.html"
-                            ><span class="n">07</span
-                            ><span>Caches and one load</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Calls and data</p>
-                <ol>
-                    <li>
-                        <a href="08-function-calls-and-stack-frames.html"
-                            ><span class="n">08</span
-                            ><span>Calls and stack frames</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="09-rust-values-stack-heap-and-box.html"
-                            ><span class="n">09</span
-                            ><span>Values, stack, heap, Box</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="10-string-and-vec-memory.html"
-                            ><span class="n">10</span
-                            ><span>String and Vec</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Rust's rules</p>
-                <ol>
-                    <li>
-                        <a href="11-ownership-moves-clone-and-drop.html"
-                            ><span class="n">11</span
-                            ><span>Ownership, moves, drop</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="12-references-borrowing-and-lifetimes.html"
-                            ><span class="n">12</span
-                            ><span>References and lifetimes</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="13-iterators-and-following-data.html"
-                            ><span class="n">13</span><span>Iterators</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="14-memory-bugs-and-rust-safety.html"
-                            ><span class="n">14</span
-                            ><span>Memory bugs and safety</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">All together</p>
-                <ol>
-                    <li>
-                        <a href="15-follow-one-example-end-to-end.html"
-                            ><span class="n">15</span
-                            ><span>One call, every layer</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Reference</p>
-                <ul class="toc__ref">
-                    <li><a href="../reference/glossary.html">Glossary</a></li>
-                    <li><a href="../reference/sources.html">Sources</a></li>
-                    <li>
-                        <a href="../reference/concept-map.html">Concept map</a>
-                    </li>
-                </ul>
-            </nav>
-            <main id="main">
-                <article class="page">
-                    <header class="opening">
-                        <div class="opening__meta">
-                            <span class="opening__num">04</span
-                            ><span class="tag tag-os">Operating system</span>
-                            <span class="tag tag-comp"
-                                >Compiler &amp; runtime</span
-                            >
-                        </div>
-                        <h1>What is inside a process's address space?</h1>
-                        <p class="why">
-                            Each
-                            <a href="03-programs-processes-and-the-kernel.html"
-                                >process</a
-                            >
-                            gets its own address space: the range of addresses
-                            its instructions can use. Here is one opened up,
-                            using the memory map of a real Rust program.
-                        </p>
-                    </header>
-                    <ul
-                        class="legend"
-                        aria-label="Which layer each colour means"
-                    >
-                        <li><span class="sw sw-rust"></span>Rust language</li>
-                        <li>
-                            <span class="sw sw-comp"></span>Compiler &amp;
-                            runtime library
-                        </li>
-                        <li><span class="sw sw-os"></span>Operating system</li>
-                        <li>
-                            <span class="sw sw-hw"></span>CPU &amp; hardware
-                        </li>
-                    </ul>
-                    <p>
-                        A <span class="term">virtual address</span> is a number
-                        an instruction uses to name a byte, such as
-                        <code>[rsp+8]</code> in a load instruction. It only has
-                        meaning inside one process. With virtual memory, every
-                        memory access a program makes uses a virtual address
-                        <a
-                            class="src"
-                            href="https://www.kernel.org/doc/html/latest/admin-guide/mm/concepts.html"
-                            >kernel docs</a
-                        >, and the hardware
-                        <a href="05-physical-ram-and-address-translation.html"
-                            >translates it to a physical one</a
-                        >
-                        behind the scenes.
-                    </p>
-                    <p>
-                        The
-                        <a
-                            href="https://en.wikipedia.org/wiki/Virtual_memory"
-                            class="ext"
-                            >address space</a
-                        >
-                        is the whole range of those numbers. On x86-64 Linux,
-                        the part a program may use runs from 0 to about 128 TiB
-                        <a
-                            class="src"
-                            href="https://www.kernel.org/doc/html/latest/arch/x86/x86_64/mm.html"
-                            >x86-64 mm docs</a
-                        >. That is far more than any computer's RAM, so almost
-                        all of it is empty. Only some ranges are
-                        <span class="term">mapped</span>: the kernel has
-                        recorded what they are for and what may be done with
-                        them.
-                    </p>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What is inside a process&#x27;s address space? — How a Rust program meets the machine</title>
+<meta name="description" content="What a process&#x27;s virtual address space contains: code, data, the heap, anonymous mappings, shared libraries and thread stacks, shown with the real memory map of a running Rust program on Linux.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/diagrams.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the text</a>
+<header class="top">
+  <a class="top__title" href="../index.html">How a Rust program meets the machine</a>
+  <span class="top__here">04 · Inside an address space</span>
+  <span class="top__spacer"></span>
+  <button class="top__btn" type="button" data-toc-toggle aria-expanded="false" aria-controls="toc">Contents</button>
+</header>
+<div class="shell">
+<nav class="toc" id="toc" aria-label="Contents">
+<a class="toc__home" href="../index.html">The whole map</a>
+<p class="toc__group">Before your code runs</p><ol>
+<li><a href="01-what-is-a-program.html"><span class="n">01</span><span>What a program is</span></a></li>
+<li><a href="02-how-a-cpu-runs-code.html"><span class="n">02</span><span>How a CPU runs code</span></a></li>
+<li><a href="03-programs-processes-and-the-kernel.html"><span class="n">03</span><span>Processes and the kernel</span></a></li>
+</ol>
+<p class="toc__group">Addresses</p><ol>
+<li><a href="04-virtual-memory.html" aria-current="page"><span class="n">04</span><span>Inside an address space</span></a><ol class="toc__sub"><li class="lv2"><a href="#a-real-map">A real map</a></li><li class="lv2"><a href="#reading-the-map">Reading the map</a></li><li class="lv2"><a href="#mapped-is-not-the-same-as-in-ram">Mapped is not the same as in RAM</a></li><li class="lv2"><a href="#who-decides-the-layout">Who decides the layout?</a></li><li class="lv2"><a href="#keep-h">What to remember</a></li><li class="lv2"><a href="#test-h">Check your understanding</a></li></ol></li>
+<li><a href="05-physical-ram-and-address-translation.html"><span class="n">05</span><span>From virtual address to RAM</span></a></li>
+<li><a href="06-threads-and-their-stacks.html"><span class="n">06</span><span>Threads and their stacks</span></a></li>
+<li><a href="07-registers-caches-and-a-memory-read.html"><span class="n">07</span><span>Caches and one load</span></a></li>
+</ol>
+<p class="toc__group">Calls and data</p><ol>
+<li><a href="08-function-calls-and-stack-frames.html"><span class="n">08</span><span>Calls and stack frames</span></a></li>
+<li><a href="09-rust-values-stack-heap-and-box.html"><span class="n">09</span><span>Values, stack, heap, Box</span></a></li>
+<li><a href="10-string-and-vec-memory.html"><span class="n">10</span><span>String and Vec</span></a></li>
+</ol>
+<p class="toc__group">Rust's rules</p><ol>
+<li><a href="11-ownership-moves-clone-and-drop.html"><span class="n">11</span><span>Ownership, moves, drop</span></a></li>
+<li><a href="12-references-borrowing-and-lifetimes.html"><span class="n">12</span><span>References and lifetimes</span></a></li>
+<li><a href="13-iterators-and-following-data.html"><span class="n">13</span><span>Iterators</span></a></li>
+<li><a href="14-memory-bugs-and-rust-safety.html"><span class="n">14</span><span>Memory bugs and safety</span></a></li>
+</ol>
+<p class="toc__group">All together</p><ol>
+<li><a href="15-follow-one-example-end-to-end.html"><span class="n">15</span><span>One call, every layer</span></a></li>
+</ol>
+<p class="toc__group">Reference</p><ul class="toc__ref">
+<li><a href="../reference/glossary.html">Glossary</a></li>
+<li><a href="../reference/sources.html">Sources</a></li>
+<li><a href="../reference/concept-map.html">Concept map</a></li>
+</ul>
+</nav>
+<main id="main">
+<article class="page">
+<header class="opening">
+  <div class="opening__meta"><span class="opening__num">04</span><span class="tag tag-os">Operating system</span> <span class="tag tag-comp">Compiler &amp; runtime</span></div>
+  <h1>What is inside a process's address space?</h1>
+  <p class="why">Each <a href="03-programs-processes-and-the-kernel.html">process</a> gets its own address space: the range of addresses its instructions can use. Here is one opened up, using the memory map of a real Rust program.</p>
+</header>
+<ul class="legend" aria-label="Which layer each colour means"><li><span class="sw sw-rust"></span>Rust language</li><li><span class="sw sw-comp"></span>Compiler &amp; runtime library</li><li><span class="sw sw-os"></span>Operating system</li><li><span class="sw sw-hw"></span>CPU &amp; hardware</li></ul>
+<p>
+  A <span class="term">virtual address</span> is a number an instruction uses to name a byte, such as <code>[rsp+8]</code> in a load instruction. It only has meaning inside one process. With virtual memory, every memory access a program makes uses a virtual address <a class="src" href="https://www.kernel.org/doc/html/latest/admin-guide/mm/concepts.html">kernel docs</a>, and the hardware <a href="05-physical-ram-and-address-translation.html">translates it to a physical one</a> behind the scenes.
+</p>
+<p>
+  The <a href="https://en.wikipedia.org/wiki/Virtual_memory" class="ext">address space</a> is the whole range of those numbers. On x86-64 Linux, the part a program may use runs from 0 to about 128 TiB <a class="src" href="https://www.kernel.org/doc/html/latest/arch/x86/x86_64/mm.html">x86-64 mm docs</a>. That is far more than any computer's RAM, so almost all of it is empty. Only some ranges are <span class="term">mapped</span>: the kernel has recorded what they are for and what may be done with them.
+</p>
 
-                    <h2 id="a-real-map">A real map</h2>
-                    <p>
-                        On Linux, every process can read its own map from the
-                        file <code>/proc/self/maps</code>. Each line is one
-                        mapping: an address range, permissions, and what backs
-                        it
-                        <a
-                            class="src"
-                            href="https://man7.org/linux/man-pages/man5/proc_pid_maps.5.html"
-                            >proc_pid_maps(5)</a
-                        >. The program below creates two vectors and a second
-                        thread, prints a few addresses, then prints its own map.
-                    </p>
-                    <div class="codeblock">
-                        <div class="codeblock__label">
-                            <span>examples/maps.rs (shortened)</span
-                            ><span>run on Linux x86-64</span>
-                        </div>
-                        <pre><code><span class="k">let</span> small = vec![10, 20, 30];          <span class="c">// 12 bytes of elements</span>
+<h2 id="a-real-map">A real map</h2>
+<p>
+  On Linux, every process can read its own map from the file <code>/proc/self/maps</code>. Each line is one mapping: an address range, permissions, and what backs it <a class="src" href="https://man7.org/linux/man-pages/man5/proc_pid_maps.5.html">proc_pid_maps(5)</a>. The program below creates two vectors and a second thread, prints a few addresses, then prints its own map.
+</p>
+<div class="codeblock">
+  <div class="codeblock__label"><span>examples/maps.rs (shortened)</span><span>run on Linux x86-64</span></div>
+<pre><code><span class="k">let</span> small = vec![10, 20, 30];          <span class="c">// 12 bytes of elements</span>
 <span class="k">let</span> big = vec![0u8; 1 &lt;&lt; 20];          <span class="c">// 1 MiB of elements</span>
 <span class="k">let</span> local = 7;
 <span class="k">let</span> h = thread::spawn(|| { <span class="k">let</span> t = 1; println!(<span class="c">"{:p}"</span>, &amp;t); … });
@@ -270,1010 +80,261 @@ println!(<span class="c">"{:p}"</span>, small.as_ptr());       <span class="c">/
 println!(<span class="c">"{:p}"</span>, big.as_ptr());
 println!(<span class="c">"{:p}"</span>, &amp;local);
 print!(<span class="c">"{}"</span>, fs::read_to_string(<span class="c">"/proc/self/maps"</span>)?);</code></pre>
-                    </div>
-                    <p>
-                        The figure draws that map with low addresses at the
-                        bottom, as the numbers grow upwards. Empty stretches
-                        between mappings are drawn as hatched gaps; they are
-                        huge, and drawing them to scale would make the mappings
-                        invisible. Click a region to see what lives there and
-                        who manages it.
-                    </p>
+</div>
+<p>
+  The figure draws that map with low addresses at the bottom, as the numbers grow upwards. Empty stretches between mappings are drawn as hatched gaps; they are huge, and drawing them to scale would make the mappings invisible. Click a region to see what lives there and who manages it.
+</p>
 
-                    <figure
-                        class="fig"
-                        data-fig="vmmap"
-                        data-label="address space map"
-                    >
-                        <div class="fig__head">
-                            <p class="fig__title">
-                                One process's address space, from
-                                <code>/proc/self/maps</code>
-                            </p>
-                            <span class="fig__kind"
-                                >Real run · Linux x86-64 · not to scale</span
-                            >
-                        </div>
-                        <div class="vm">
-                            <div>
-                                <div class="controls">
-                                    <span class="controls__label">Show</span>
-                                    <div class="seg" data-choice="overlay">
-                                        <button
-                                            class="btn"
-                                            type="button"
-                                            data-value="a"
-                                            aria-pressed="true"
-                                        >
-                                            Process A
-                                        </button>
-                                        <button
-                                            class="btn"
-                                            type="button"
-                                            data-value="ab"
-                                        >
-                                            A and B side by side
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="vm__strips">
-                                    <div class="vstrip">
-                                        <div class="vstrip__h">
-                                            <span>Process A</span
-                                            ><span class="mono">high ↑</span>
-                                        </div>
-                                        <div class="vgap">
-                                            kernel space above here: no access
-                                        </div>
-                                        <button
-                                            class="vreg k-stack"
-                                            type="button"
-                                            data-r="stack"
-                                            aria-pressed="false"
-                                        >
-                                            <span class="perm">rw-</span>Main
-                                            thread stack <code>[stack]</code
-                                            ><span class="addr"
-                                                >7ffdddd13000–7ffdddd35000</span
-                                            ><span class="ptr"
-                                                >&amp;local = 7ffdddd331bc</span
-                                            >
-                                        </button>
-                                        <div class="vgap vgap--big">
-                                            ≈ 2.3 TiB of nothing
-                                        </div>
-                                        <button
-                                            class="vreg k-kern"
-                                            type="button"
-                                            data-r="vdso"
-                                            aria-pressed="false"
-                                        >
-                                            <span class="perm">r-x</span
-                                            >Kernel-provided page
-                                            <code>[vdso]</code
-                                            ><span class="addr"
-                                                >7dae64e43000–7dae64e4b000</span
-                                            >
-                                        </button>
-                                        <button
-                                            class="vreg k-lib"
-                                            type="button"
-                                            data-r="ld"
-                                            aria-pressed="false"
-                                        >
-                                            <span class="perm">r-x …</span
-                                            >Dynamic loader<span class="addr"
-                                                >7dae64e4b000–7dae64e89000</span
-                                            >
-                                        </button>
-                                        <button
-                                            class="vreg k-lib"
-                                            type="button"
-                                            data-r="libgcc"
-                                            aria-pressed="false"
-                                        >
-                                            <span class="perm">r-x …</span
-                                            ><code>libgcc_s.so.1</code
-                                            ><span class="addr"
-                                                >7dae64df5000–7dae64e23000</span
-                                            >
-                                        </button>
-                                        <button
-                                            class="vreg k-anon"
-                                            type="button"
-                                            data-r="big"
-                                            aria-pressed="false"
-                                        >
-                                            <span class="perm">rw-</span
-                                            >Anonymous mapping, 1 MiB<span
-                                                class="addr"
-                                                >7dae64cf2000–7dae64df5000</span
-                                            ><span class="ptr"
-                                                >big.as_ptr() =
-                                                7dae64cf2010</span
-                                            >
-                                        </button>
-                                        <button
-                                            class="vreg k-lib"
-                                            type="button"
-                                            data-r="libc"
-                                            aria-pressed="false"
-                                        >
-                                            <span class="perm">r-x …</span>C
-                                            library <code>libc.so.6</code
-                                            ><span class="addr"
-                                                >7dae64a00000–7dae64c14000</span
-                                            >
-                                        </button>
-                                        <button
-                                            class="vreg k-stack"
-                                            type="button"
-                                            data-r="tstack"
-                                            aria-pressed="false"
-                                        >
-                                            <span class="perm">rw-</span>Second
-                                            thread's stack (anonymous)<span
-                                                class="addr"
-                                                >7dae647ff000–7dae64a00000</span
-                                            ><span class="ptr"
-                                                >&amp;t = 7dae649fed3c</span
-                                            >
-                                        </button>
-                                        <button
-                                            class="vreg k-anon"
-                                            type="button"
-                                            data-r="arena"
-                                            aria-pressed="false"
-                                        >
-                                            <span class="perm">rw- / ---</span
-                                            >Anonymous, mostly reserved<span
-                                                class="addr"
-                                                >7dae60000000–7dae64000000</span
-                                            >
-                                        </button>
-                                        <div class="vgap vgap--big">
-                                            ≈ 38 TiB of nothing
-                                        </div>
-                                        <button
-                                            class="vreg k-heap"
-                                            type="button"
-                                            data-r="heap"
-                                            aria-pressed="false"
-                                        >
-                                            <span class="perm">rw-</span>Heap
-                                            <code>[heap]</code
-                                            ><span class="addr"
-                                                >579e63956000–579e63977000</span
-                                            ><span class="ptr"
-                                                >small.as_ptr() =
-                                                579e63956d50</span
-                                            >
-                                        </button>
-                                        <div class="vgap">gap</div>
-                                        <button
-                                            class="vreg k-code"
-                                            type="button"
-                                            data-r="exe"
-                                            aria-pressed="false"
-                                        >
-                                            <span class="perm"
-                                                >r-- r-x r-- rw-</span
-                                            >The executable <code>maps</code
-                                            ><span class="addr"
-                                                >579e450d8000–579e45137000</span
-                                            ><span class="ptr"
-                                                >main = 579e450f0050</span
-                                            >
-                                        </button>
-                                        <div class="vgap vgap--big">
-                                            ≈ 88 TiB of nothing, down to 0
-                                        </div>
-                                        <div class="vstrip__h">
-                                            <span></span
-                                            ><span class="mono">0 ↓</span>
-                                        </div>
-                                    </div>
-                                    <div
-                                        class="vstrip vstrip--b"
-                                        aria-label="Process B, a second run"
-                                    >
-                                        <div class="vstrip__h">
-                                            <span>Process B</span
-                                            ><span class="mono">high ↑</span>
-                                        </div>
-                                        <div class="vgap">kernel space</div>
-                                        <div class="vreg k-stack">
-                                            <span class="perm">rw-</span>Main
-                                            thread stack<span class="addr"
-                                                >7ffdfa8e3000–7ffdfa905000</span
-                                            >
-                                        </div>
-                                        <div class="vgap vgap--big"></div>
-                                        <div class="vreg k-kern">
-                                            [vdso]<span class="addr"
-                                                >79a819ba4000–79a819bac000</span
-                                            >
-                                        </div>
-                                        <div class="vreg k-lib">
-                                            Dynamic loader<span class="addr"
-                                                >79a819bac000–79a819bea000</span
-                                            >
-                                        </div>
-                                        <div class="vreg k-lib">
-                                            <code>libgcc_s.so.1</code
-                                            ><span class="addr"
-                                                >79a819b56000–79a819b84000</span
-                                            >
-                                        </div>
-                                        <div class="vreg k-anon">
-                                            Anonymous, 1 MiB<span class="addr"
-                                                >79a819a53000–79a819b56000</span
-                                            >
-                                        </div>
-                                        <div class="vreg k-lib">
-                                            C library<span class="addr"
-                                                >79a819800000–79a819a14000</span
-                                            >
-                                        </div>
-                                        <div class="vreg k-stack">
-                                            Second thread's stack<span
-                                                class="addr"
-                                                >79a8195ff000–79a819800000</span
-                                            >
-                                        </div>
-                                        <div class="vreg k-anon">
-                                            Anonymous, reserved<span
-                                                class="addr"
-                                                >79a814000000–79a818000000</span
-                                            >
-                                        </div>
-                                        <div class="vgap vgap--big"></div>
-                                        <div class="vreg k-heap">
-                                            Heap <code>[heap]</code
-                                            ><span class="addr"
-                                                >624f4df9c000–624f4dfbd000</span
-                                            >
-                                        </div>
-                                        <div class="vgap"></div>
-                                        <div class="vreg k-code">
-                                            The executable<span class="addr"
-                                                >624f4b29d000–624f4b2fc000</span
-                                            >
-                                        </div>
-                                        <div class="vgap vgap--big"></div>
-                                        <div class="vstrip__h">
-                                            <span></span
-                                            ><span class="mono">0 ↓</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+<figure class="fig" data-fig="vmmap" data-label="address space map">
+  <div class="fig__head">
+    <p class="fig__title">One process's address space, from <code>/proc/self/maps</code></p>
+    <span class="fig__kind">Real run · Linux x86-64 · not to scale</span>
+  </div>
+  <div class="vm">
+    <div>
+      <div class="controls">
+        <span class="controls__label">Show</span>
+        <div class="seg" data-choice="overlay">
+          <button class="btn" type="button" data-value="a" aria-pressed="true">Process A</button>
+          <button class="btn" type="button" data-value="ab">A and B side by side</button>
+        </div>
+      </div>
+      <div class="vm__strips">
+        <div class="vstrip">
+          <div class="vstrip__h"><span>Process A</span><span class="mono">high ↑</span></div>
+          <div class="vgap">kernel space above here: no access</div>
+          <button class="vreg k-stack" type="button" data-r="stack" aria-pressed="false"><span class="perm">rw-</span>Main thread stack <code>[stack]</code><span class="addr">7ffdddd13000–7ffdddd35000</span><span class="ptr">&amp;local = 7ffdddd331bc</span></button>
+          <div class="vgap vgap--big">≈ 2.3 TiB of nothing</div>
+          <button class="vreg k-kern" type="button" data-r="vdso" aria-pressed="false"><span class="perm">r-x</span>Kernel-provided page <code>[vdso]</code><span class="addr">7dae64e43000–7dae64e4b000</span></button>
+          <button class="vreg k-lib" type="button" data-r="ld" aria-pressed="false"><span class="perm">r-x …</span>Dynamic loader<span class="addr">7dae64e4b000–7dae64e89000</span></button>
+          <button class="vreg k-lib" type="button" data-r="libgcc" aria-pressed="false"><span class="perm">r-x …</span><code>libgcc_s.so.1</code><span class="addr">7dae64df5000–7dae64e23000</span></button>
+          <button class="vreg k-anon" type="button" data-r="big" aria-pressed="false"><span class="perm">rw-</span>Anonymous mapping, 1 MiB<span class="addr">7dae64cf2000–7dae64df5000</span><span class="ptr">big.as_ptr() = 7dae64cf2010</span></button>
+          <button class="vreg k-lib" type="button" data-r="libc" aria-pressed="false"><span class="perm">r-x …</span>C library <code>libc.so.6</code><span class="addr">7dae64a00000–7dae64c14000</span></button>
+          <button class="vreg k-stack" type="button" data-r="tstack" aria-pressed="false"><span class="perm">rw-</span>Second thread's stack (anonymous)<span class="addr">7dae647ff000–7dae64a00000</span><span class="ptr">&amp;t = 7dae649fed3c</span></button>
+          <button class="vreg k-anon" type="button" data-r="arena" aria-pressed="false"><span class="perm">rw- / ---</span>Anonymous, mostly reserved<span class="addr">7dae60000000–7dae64000000</span></button>
+          <div class="vgap vgap--big">≈ 38 TiB of nothing</div>
+          <button class="vreg k-heap" type="button" data-r="heap" aria-pressed="false"><span class="perm">rw-</span>Heap <code>[heap]</code><span class="addr">579e63956000–579e63977000</span><span class="ptr">small.as_ptr() = 579e63956d50</span></button>
+          <div class="vgap">gap</div>
+          <button class="vreg k-code" type="button" data-r="exe" aria-pressed="false"><span class="perm">r-- r-x r-- rw-</span>The executable <code>maps</code><span class="addr">579e450d8000–579e45137000</span><span class="ptr">main = 579e450f0050</span></button>
+          <div class="vgap vgap--big">≈ 88 TiB of nothing, down to 0</div>
+          <div class="vstrip__h"><span></span><span class="mono">0 ↓</span></div>
+        </div>
+        <div class="vstrip vstrip--b" aria-label="Process B, a second run">
+          <div class="vstrip__h"><span>Process B</span><span class="mono">high ↑</span></div>
+          <div class="vgap">kernel space</div>
+          <div class="vreg k-stack"><span class="perm">rw-</span>Main thread stack<span class="addr">7ffdfa8e3000–7ffdfa905000</span></div>
+          <div class="vgap vgap--big"></div>
+          <div class="vreg k-kern">[vdso]<span class="addr">79a819ba4000–79a819bac000</span></div>
+          <div class="vreg k-lib">Dynamic loader<span class="addr">79a819bac000–79a819bea000</span></div>
+          <div class="vreg k-lib"><code>libgcc_s.so.1</code><span class="addr">79a819b56000–79a819b84000</span></div>
+          <div class="vreg k-anon">Anonymous, 1 MiB<span class="addr">79a819a53000–79a819b56000</span></div>
+          <div class="vreg k-lib">C library<span class="addr">79a819800000–79a819a14000</span></div>
+          <div class="vreg k-stack">Second thread's stack<span class="addr">79a8195ff000–79a819800000</span></div>
+          <div class="vreg k-anon">Anonymous, reserved<span class="addr">79a814000000–79a818000000</span></div>
+          <div class="vgap vgap--big"></div>
+          <div class="vreg k-heap">Heap <code>[heap]</code><span class="addr">624f4df9c000–624f4dfbd000</span></div>
+          <div class="vgap"></div>
+          <div class="vreg k-code">The executable<span class="addr">624f4b29d000–624f4b2fc000</span></div>
+          <div class="vgap vgap--big"></div>
+          <div class="vstrip__h"><span></span><span class="mono">0 ↓</span></div>
+        </div>
+      </div>
+    </div>
 
-                            <div
-                                class="vm__detail vm__detail--all"
-                                aria-live="polite"
-                            >
-                                <div data-d="intro" class="is-shown">
-                                    <h4>Pick a region</h4>
-                                    <p>
-                                        Each band is one or more lines of the
-                                        real map. The colour on its left edge
-                                        says who decides what is in it.
-                                        <span class="tag tag-comp"
-                                            >Compiler &amp; runtime</span
-                                        >
-                                        marks code and libraries.
-                                        <span class="tag tag-rust"
-                                            >Rust values</span
-                                        >
-                                        marks memory that holds your program's
-                                        values.
-                                        <span class="tag tag-os">OS</span> marks
-                                        stacks and pages that the kernel or the
-                                        thread library set up.
-                                    </p>
-                                    <p>
-                                        Rows with a pointer underneath contain
-                                        something the program printed: the
-                                        vector buffers, two locals, and the
-                                        function <code>main</code>.
-                                    </p>
-                                </div>
-                                <div data-d="exe">
-                                    <h4>
-                                        The executable file, mapped four times
-                                    </h4>
-                                    <dl>
-                                        <dt>What lives here</dt>
-                                        <dd>
-                                            The program's own
-                                            <a href="01-what-is-a-program.html"
-                                                >executable file</a
-                                            >, mapped in four ranges with
-                                            different permissions. Headers and
-                                            read-only data are <code>r--</code>.
-                                            Machine code, including
-                                            <code>main</code>, is
-                                            <code>r-x</code>. Data that becomes
-                                            read-only after start-up is
-                                            <code>r--</code>. Writable globals
-                                            (<code>.data</code> and
-                                            <code>.bss</code>) are
-                                            <code>rw-</code>.
-                                        </dd>
-                                        <dt>Who manages it</dt>
-                                        <dd>
-                                            The kernel mapped it from the
-                                            program headers
-                                            <span class="tag tag-os">OS</span>.
-                                            The compiler and linker decided what
-                                            goes in each part
-                                            <span class="tag tag-comp"
-                                                >Compiler</span
-                                            >.
-                                        </dd>
-                                        <dt>Real lines</dt>
-                                        <dd>
-                                            <pre>
-579e450d8000-579e450ef000 r--p 00000000 … maps
+    <div class="vm__detail vm__detail--all" aria-live="polite">
+      <div data-d="intro" class="is-shown">
+        <h4>Pick a region</h4>
+        <p>Each band is one or more lines of the real map. The colour on its left edge says who decides what is in it. <span class="tag tag-comp">Compiler &amp; runtime</span> marks code and libraries. <span class="tag tag-rust">Rust values</span> marks memory that holds your program's values. <span class="tag tag-os">OS</span> marks stacks and pages that the kernel or the thread library set up.</p>
+        <p>Rows with a pointer underneath contain something the program printed: the vector buffers, two locals, and the function <code>main</code>.</p>
+      </div>
+      <div data-d="exe">
+        <h4>The executable file, mapped four times</h4>
+        <dl>
+          <dt>What lives here</dt><dd>The program's own <a href="01-what-is-a-program.html">executable file</a>, mapped in four ranges with different permissions. Headers and read-only data are <code>r--</code>. Machine code, including <code>main</code>, is <code>r-x</code>. Data that becomes read-only after start-up is <code>r--</code>. Writable globals (<code>.data</code> and <code>.bss</code>) are <code>rw-</code>.</dd>
+          <dt>Who manages it</dt><dd>The kernel mapped it from the program headers <span class="tag tag-os">OS</span>. The compiler and linker decided what goes in each part <span class="tag tag-comp">Compiler</span>.</dd>
+          <dt>Real lines</dt><dd><pre>579e450d8000-579e450ef000 r--p 00000000 … maps
 579e450ef000-579e45132000 r-xp 00016000 … maps
 579e45132000-579e45135000 r--p 00058000 … maps
-579e45135000-579e45137000 rw-p 0005a000 … maps</pre
-                                            >
-                                        </dd>
-                                    </dl>
-                                </div>
-                                <div data-d="heap">
-                                    <h4>The <code>[heap]</code> mapping</h4>
-                                    <dl>
-                                        <dt>What lives here</dt>
-                                        <dd>
-                                            Small heap allocations. The 12-byte
-                                            buffer of <code>small</code> is
-                                            here, at <code>579e63956d50</code>.
-                                        </dd>
-                                        <dt>Who manages it</dt>
-                                        <dd>
-                                            The kernel grows this range when
-                                            asked (<code>brk</code>)
-                                            <span class="tag tag-os">OS</span>.
-                                            The allocator cuts it into blocks
-                                            and hands them to <code>Vec</code>,
-                                            <code>Box</code> and
-                                            <code>String</code>
-                                            <span class="tag tag-comp"
-                                                >Allocator</span
-                                            >. The C library's
-                                            <code>malloc</code> normally takes
-                                            memory from here
-                                            <a
-                                                class="src"
-                                                href="https://man7.org/linux/man-pages/man3/malloc.3.html"
-                                                >malloc(3)</a
-                                            >.
-                                        </dd>
-                                        <dt>Careful with the word "heap"</dt>
-                                        <dd>
-                                            This one line is labelled
-                                            <code>[heap]</code>, but heap
-                                            allocations also live elsewhere: see
-                                            the 1 MiB anonymous mapping.
-                                            "Heap-allocated" means "obtained
-                                            from the allocator", not "inside
-                                            this range".
-                                        </dd>
-                                        <dt>Real line</dt>
-                                        <dd>
-                                            <pre>
-579e63956000-579e63977000 rw-p 00000000 00:00 0  [heap]</pre
-                                            >
-                                        </dd>
-                                    </dl>
-                                </div>
-                                <div data-d="arena">
-                                    <h4>Anonymous mapping, mostly reserved</h4>
-                                    <dl>
-                                        <dt>What lives here</dt>
-                                        <dd>
-                                            A 64 MiB range where only the first
-                                            132 KiB is readable and writable.
-                                            The rest is mapped with no
-                                            permissions (<code>---</code>): the
-                                            addresses are reserved, but touching
-                                            them would fault.
-                                        </dd>
-                                        <dt>Who manages it</dt>
-                                        <dd>
-                                            Probably the C library's allocator,
-                                            which creates extra allocation areas
-                                            ("arenas") for programs with several
-                                            threads
-                                            <a
-                                                class="src"
-                                                href="https://man7.org/linux/man-pages/man3/malloc.3.html"
-                                                >malloc(3)</a
-                                            >
-                                            <span class="tag tag-comp"
-                                                >Allocator</span
-                                            >. The map does not label it, so
-                                            this is an inference, not something
-                                            the map states.
-                                        </dd>
-                                        <dt>Real lines</dt>
-                                        <dd>
-                                            <pre>
-7dae60000000-7dae60021000 rw-p 00000000 00:00 0
-7dae60021000-7dae64000000 ---p 00000000 00:00 0</pre
-                                            >
-                                        </dd>
-                                    </dl>
-                                </div>
-                                <div data-d="tstack">
-                                    <h4>The second thread's stack</h4>
-                                    <dl>
-                                        <dt>What lives here</dt>
-                                        <dd>
-                                            The call stack of the thread created
-                                            with <code>thread::spawn</code>. Its
-                                            local <code>t</code> is at
-                                            <code>7dae649fed3c</code>, inside
-                                            this range. The range is slightly
-                                            more than 2 MiB, which matches the
-                                            Rust standard library's current
-                                            default for new threads
-                                            <a
-                                                class="src"
-                                                href="https://doc.rust-lang.org/std/thread/index.html#stack-size"
-                                                >std::thread</a
-                                            >.
-                                        </dd>
-                                        <dt>Who manages it</dt>
-                                        <dd>
-                                            The thread library allocated it as
-                                            an ordinary anonymous mapping
-                                            <span class="tag tag-comp"
-                                                >Runtime</span
-                                            >; the kernel backs it
-                                            <span class="tag tag-os">OS</span>.
-                                            Current Linux does not label thread
-                                            stacks in this file; older kernels
-                                            (3.4–4.4) wrote
-                                            <code>[stack:TID]</code>.
-                                        </dd>
-                                        <dt>Real line</dt>
-                                        <dd>
-                                            <pre>
-7dae647ff000-7dae64a00000 rw-p 00000000 00:00 0</pre
-                                            >
-                                        </dd>
-                                    </dl>
-                                </div>
-                                <div data-d="libc">
-                                    <h4>A shared library</h4>
-                                    <dl>
-                                        <dt>What lives here</dt>
-                                        <dd>
-                                            The C library, mapped from
-                                            <code
-                                                >/usr/lib/x86_64-linux-gnu/libc.so.6</code
-                                            >
-                                            in five ranges (code, read-only
-                                            data, writable data). Rust's
-                                            standard library calls into it for
-                                            things like <code>malloc</code> and
-                                            thread creation.
-                                        </dd>
-                                        <dt>Who manages it</dt>
-                                        <dd>
-                                            The dynamic loader mapped it at
-                                            start-up
-                                            <span class="tag tag-comp"
-                                                >Runtime</span
-                                            >. Its code pages are
-                                            <a
-                                                href="https://en.wikipedia.org/wiki/Memory-mapped_file"
-                                                class="ext"
-                                                >mapped from the library file</a
-                                            >
-                                            and can be shared by every process
-                                            that uses the same library.
-                                        </dd>
-                                    </dl>
-                                </div>
-                                <div data-d="big">
-                                    <h4>
-                                        Anonymous mapping holding the 1 MiB
-                                        vector
-                                    </h4>
-                                    <dl>
-                                        <dt>What lives here</dt>
-                                        <dd>
-                                            The elements of <code>big</code>,
-                                            starting at
-                                            <code>7dae64cf2010</code>. This is a
-                                            heap allocation that is
-                                            <em>not</em> in <code>[heap]</code>.
-                                        </dd>
-                                        <dt>Who manages it</dt>
-                                        <dd>
-                                            For large requests, glibc's
-                                            <code>malloc</code> asks the kernel
-                                            for a private anonymous mapping with
-                                            <code>mmap</code> instead of using
-                                            <code>[heap]</code>; the default
-                                            threshold is 128 kB
-                                            <a
-                                                class="src"
-                                                href="https://man7.org/linux/man-pages/man3/malloc.3.html"
-                                                >malloc(3)</a
-                                            >
-                                            <span class="tag tag-comp"
-                                                >Allocator</span
-                                            >. "Anonymous" means no file backs
-                                            it, and its contents start as zeros
-                                            <a
-                                                class="src"
-                                                href="https://man7.org/linux/man-pages/man2/mmap.2.html"
-                                                >mmap(2)</a
-                                            >.
-                                        </dd>
-                                        <dt>Real line</dt>
-                                        <dd>
-                                            <pre>
-7dae64cf2000-7dae64df5000 rw-p 00000000 00:00 0</pre
-                                            >
-                                        </dd>
-                                    </dl>
-                                </div>
-                                <div data-d="libgcc">
-                                    <h4>Another shared library</h4>
-                                    <dl>
-                                        <dt>What lives here</dt>
-                                        <dd>
-                                            <code>libgcc_s.so.1</code>, a
-                                            support library the Rust standard
-                                            library uses on Linux, for example
-                                            for unwinding during a panic.
-                                        </dd>
-                                        <dt>Who manages it</dt>
-                                        <dd>
-                                            Mapped by the dynamic loader
-                                            <span class="tag tag-comp"
-                                                >Runtime</span
-                                            >.
-                                        </dd>
-                                    </dl>
-                                </div>
-                                <div data-d="ld">
-                                    <h4>The dynamic loader</h4>
-                                    <dl>
-                                        <dt>What lives here</dt>
-                                        <dd>
-                                            <code>ld-linux-x86-64.so.2</code>,
-                                            the program the kernel starts first,
-                                            before any of the executable's own
-                                            code. It stays mapped while the
-                                            process runs.
-                                        </dd>
-                                        <dt>Who manages it</dt>
-                                        <dd>
-                                            The kernel mapped it because the
-                                            executable names it as its
-                                            interpreter
-                                            <span class="tag tag-os">OS</span>.
-                                        </dd>
-                                    </dl>
-                                </div>
-                                <div data-d="vdso">
-                                    <h4>Pages supplied by the kernel</h4>
-                                    <dl>
-                                        <dt>What lives here</dt>
-                                        <dd>
-                                            <code>[vdso]</code>, "the virtual
-                                            dynamically linked shared object"
-                                            <a
-                                                class="src"
-                                                href="https://man7.org/linux/man-pages/man5/proc_pid_maps.5.html"
-                                                >proc_pid_maps(5)</a
-                                            >. It is a little code the kernel
-                                            places in every process. With it,
-                                            some requests, such as reading the
-                                            clock, can avoid a full system call.
-                                            Next to it are read-only data pages
-                                            (<code>[vvar]</code>) that the code
-                                            reads.
-                                        </dd>
-                                        <dt>Who manages it</dt>
-                                        <dd>
-                                            The kernel
-                                            <span class="tag tag-os">OS</span>.
-                                        </dd>
-                                    </dl>
-                                </div>
-                                <div data-d="stack">
-                                    <h4>The main thread's stack</h4>
-                                    <dl>
-                                        <dt>What lives here</dt>
-                                        <dd>
-                                            The call stack of the process's
-                                            first thread. The man page calls it
-                                            "the initial process's (also known
-                                            as the main thread's) stack"
-                                            <a
-                                                class="src"
-                                                href="https://man7.org/linux/man-pages/man5/proc_pid_maps.5.html"
-                                                >proc_pid_maps(5)</a
-                                            >. <code>main</code>'s local
-                                            <code>local</code> is here, at
-                                            <code>7ffdddd331bc</code>, because
-                                            the program took its address. Each
-                                            function call uses a slice of it
-                                            called a
-                                            <a
-                                                href="08-function-calls-and-stack-frames.html"
-                                                >stack frame</a
-                                            >.
-                                        </dd>
-                                        <dt>Who manages it</dt>
-                                        <dd>
-                                            The kernel created it with the
-                                            process and can grow it, up to a
-                                            limit set by
-                                            <code>ulimit -s</code> (8 MiB on
-                                            this machine)
-                                            <span class="tag tag-os">OS</span>.
-                                            Rust does not choose its size.
-                                        </dd>
-                                        <dt>Real line</dt>
-                                        <dd>
-                                            <pre>
-7ffdddd13000-7ffdddd35000 rw-p 00000000 00:00 0  [stack]</pre
-                                            >
-                                        </dd>
-                                    </dl>
-                                </div>
-                                <div data-d="b">
-                                    <h4>
-                                        Process B: the same program, run again
-                                    </h4>
-                                    <p>
-                                        The same regions appear in the same
-                                        order, at different addresses. Linux
-                                        places them at randomised positions each
-                                        run (address-space layout
-                                        randomisation). More importantly,
-                                        nothing in B's map points into A's: each
-                                        process has its own complete range from
-                                        0 upwards, and an address only means
-                                        something inside its own process.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="leaves-out leaves-out--below">
-                            <h4>What this picture leaves out</h4>
-                            <ul>
-                                <li>
-                                    Some map lines are merged into one band (the
-                                    executable, each library). A few tiny
-                                    anonymous mappings,
-                                    <code>[vvar_vclock]</code> and the legacy
-                                    <code>[vsyscall]</code> page are left out.
-                                </li>
-                                <li>
-                                    The layout is Linux on x86-64 with glibc.
-                                    Other systems, other allocators, static
-                                    linking or different settings put things in
-                                    different places. Rust itself does not
-                                    define a memory layout.
-                                </li>
-                                <li>
-                                    Gaps are not to scale. The whole drawing
-                                    spans about 128 TiB.
-                                </li>
-                            </ul>
-                        </div>
-                    </figure>
+579e45135000-579e45137000 rw-p 0005a000 … maps</pre></dd>
+        </dl>
+      </div>
+      <div data-d="heap">
+        <h4>The <code>[heap]</code> mapping</h4>
+        <dl>
+          <dt>What lives here</dt><dd>Small heap allocations. The 12-byte buffer of <code>small</code> is here, at <code>579e63956d50</code>.</dd>
+          <dt>Who manages it</dt><dd>The kernel grows this range when asked (<code>brk</code>) <span class="tag tag-os">OS</span>. The allocator cuts it into blocks and hands them to <code>Vec</code>, <code>Box</code> and <code>String</code> <span class="tag tag-comp">Allocator</span>. The C library's <code>malloc</code> normally takes memory from here <a class="src" href="https://man7.org/linux/man-pages/man3/malloc.3.html">malloc(3)</a>.</dd>
+          <dt>Careful with the word "heap"</dt><dd>This one line is labelled <code>[heap]</code>, but heap allocations also live elsewhere: see the 1 MiB anonymous mapping. "Heap-allocated" means "obtained from the allocator", not "inside this range".</dd>
+          <dt>Real line</dt><dd><pre>579e63956000-579e63977000 rw-p 00000000 00:00 0  [heap]</pre></dd>
+        </dl>
+      </div>
+      <div data-d="arena">
+        <h4>Anonymous mapping, mostly reserved</h4>
+        <dl>
+          <dt>What lives here</dt><dd>A 64 MiB range where only the first 132 KiB is readable and writable. The rest is mapped with no permissions (<code>---</code>): the addresses are reserved, but touching them would fault.</dd>
+          <dt>Who manages it</dt><dd>Probably the C library's allocator, which creates extra allocation areas ("arenas") for programs with several threads <a class="src" href="https://man7.org/linux/man-pages/man3/malloc.3.html">malloc(3)</a> <span class="tag tag-comp">Allocator</span>. The map does not label it, so this is an inference, not something the map states.</dd>
+          <dt>Real lines</dt><dd><pre>7dae60000000-7dae60021000 rw-p 00000000 00:00 0
+7dae60021000-7dae64000000 ---p 00000000 00:00 0</pre></dd>
+        </dl>
+      </div>
+      <div data-d="tstack">
+        <h4>The second thread's stack</h4>
+        <dl>
+          <dt>What lives here</dt><dd>The call stack of the thread created with <code>thread::spawn</code>. Its local <code>t</code> is at <code>7dae649fed3c</code>, inside this range. The range is slightly more than 2 MiB, which matches the Rust standard library's current default for new threads <a class="src" href="https://doc.rust-lang.org/std/thread/index.html#stack-size">std::thread</a>.</dd>
+          <dt>Who manages it</dt><dd>The thread library allocated it as an ordinary anonymous mapping <span class="tag tag-comp">Runtime</span>; the kernel backs it <span class="tag tag-os">OS</span>. Current Linux does not label thread stacks in this file; older kernels (3.4–4.4) wrote <code>[stack:TID]</code>.</dd>
+          <dt>Real line</dt><dd><pre>7dae647ff000-7dae64a00000 rw-p 00000000 00:00 0</pre></dd>
+        </dl>
+      </div>
+      <div data-d="libc">
+        <h4>A shared library</h4>
+        <dl>
+          <dt>What lives here</dt><dd>The C library, mapped from <code>/usr/lib/x86_64-linux-gnu/libc.so.6</code> in five ranges (code, read-only data, writable data). Rust's standard library calls into it for things like <code>malloc</code> and thread creation.</dd>
+          <dt>Who manages it</dt><dd>The dynamic loader mapped it at start-up <span class="tag tag-comp">Runtime</span>. Its code pages are <a href="https://en.wikipedia.org/wiki/Memory-mapped_file" class="ext">mapped from the library file</a> and can be shared by every process that uses the same library.</dd>
+        </dl>
+      </div>
+      <div data-d="big">
+        <h4>Anonymous mapping holding the 1 MiB vector</h4>
+        <dl>
+          <dt>What lives here</dt><dd>The elements of <code>big</code>, starting at <code>7dae64cf2010</code>. This is a heap allocation that is <em>not</em> in <code>[heap]</code>.</dd>
+          <dt>Who manages it</dt><dd>For large requests, glibc's <code>malloc</code> asks the kernel for a private anonymous mapping with <code>mmap</code> instead of using <code>[heap]</code>; the default threshold is 128 kB <a class="src" href="https://man7.org/linux/man-pages/man3/malloc.3.html">malloc(3)</a> <span class="tag tag-comp">Allocator</span>. "Anonymous" means no file backs it, and its contents start as zeros <a class="src" href="https://man7.org/linux/man-pages/man2/mmap.2.html">mmap(2)</a>.</dd>
+          <dt>Real line</dt><dd><pre>7dae64cf2000-7dae64df5000 rw-p 00000000 00:00 0</pre></dd>
+        </dl>
+      </div>
+      <div data-d="libgcc">
+        <h4>Another shared library</h4>
+        <dl>
+          <dt>What lives here</dt><dd><code>libgcc_s.so.1</code>, a support library the Rust standard library uses on Linux, for example for unwinding during a panic.</dd>
+          <dt>Who manages it</dt><dd>Mapped by the dynamic loader <span class="tag tag-comp">Runtime</span>.</dd>
+        </dl>
+      </div>
+      <div data-d="ld">
+        <h4>The dynamic loader</h4>
+        <dl>
+          <dt>What lives here</dt><dd><code>ld-linux-x86-64.so.2</code>, the program the kernel starts first, before any of the executable's own code. It stays mapped while the process runs.</dd>
+          <dt>Who manages it</dt><dd>The kernel mapped it because the executable names it as its interpreter <span class="tag tag-os">OS</span>.</dd>
+        </dl>
+      </div>
+      <div data-d="vdso">
+        <h4>Pages supplied by the kernel</h4>
+        <dl>
+          <dt>What lives here</dt><dd><code>[vdso]</code>, "the virtual dynamically linked shared object" <a class="src" href="https://man7.org/linux/man-pages/man5/proc_pid_maps.5.html">proc_pid_maps(5)</a>. It is a little code the kernel places in every process. With it, some requests, such as reading the clock, can avoid a full system call. Next to it are read-only data pages (<code>[vvar]</code>) that the code reads.</dd>
+          <dt>Who manages it</dt><dd>The kernel <span class="tag tag-os">OS</span>.</dd>
+        </dl>
+      </div>
+      <div data-d="stack">
+        <h4>The main thread's stack</h4>
+        <dl>
+          <dt>What lives here</dt><dd>The call stack of the process's first thread. The man page calls it "the initial process's (also known as the main thread's) stack" <a class="src" href="https://man7.org/linux/man-pages/man5/proc_pid_maps.5.html">proc_pid_maps(5)</a>. <code>main</code>'s local <code>local</code> is here, at <code>7ffdddd331bc</code>, because the program took its address. Each function call uses a slice of it called a <a href="08-function-calls-and-stack-frames.html">stack frame</a>.</dd>
+          <dt>Who manages it</dt><dd>The kernel created it with the process and can grow it, up to a limit set by <code>ulimit -s</code> (8 MiB on this machine) <span class="tag tag-os">OS</span>. Rust does not choose its size.</dd>
+          <dt>Real line</dt><dd><pre>7ffdddd13000-7ffdddd35000 rw-p 00000000 00:00 0  [stack]</pre></dd>
+        </dl>
+      </div>
+      <div data-d="b">
+        <h4>Process B: the same program, run again</h4>
+        <p>The same regions appear in the same order, at different addresses. Linux places them at randomised positions each run (address-space layout randomisation). More importantly, nothing in B's map points into A's: each process has its own complete range from 0 upwards, and an address only means something inside its own process.</p>
+      </div>
+    </div>
+  </div>
+  <div class="leaves-out leaves-out--below">
+    <h4>What this picture leaves out</h4>
+    <ul>
+      <li>Some map lines are merged into one band (the executable, each library). A few tiny anonymous mappings, <code>[vvar_vclock]</code> and the legacy <code>[vsyscall]</code> page are left out.</li>
+      <li>The layout is Linux on x86-64 with glibc. Other systems, other allocators, static linking or different settings put things in different places. Rust itself does not define a memory layout.</li>
+      <li>Gaps are not to scale. The whole drawing spans about 128 TiB.</li>
+    </ul>
+  </div>
+</figure>
 
-                    <h2 id="reading-the-map">Reading the map</h2>
-                    <p>
-                        Look at what a "process" turned out to be. It is not one
-                        block with a stack at one end and a heap at the other.
-                        It is a collection of separate mappings.
-                    </p>
-                    <p>
-                        This one has the executable in four pieces, three shared
-                        libraries and a <code>[heap]</code> range. It also has
-                        two stacks (one per thread), a large anonymous mapping
-                        holding one vector, and a few pages the kernel supplies.
-                        Each mapping has its own permissions:
-                    </p>
-                    <ul>
-                        <li>
-                            <code>r</code> read, <code>w</code> write,
-                            <code>x</code> execute, or <code>-</code> for "not
-                            allowed";
-                        </li>
-                        <li>
-                            <code>p</code> private (copy-on-write) or
-                            <code>s</code> shared with other processes.
-                        </li>
-                    </ul>
-                    <p>
-                        Machine code is <code>r-x</code>: readable and
-                        executable, but not writable. Data is <code>rw-</code>:
-                        writable but not executable. A program might try to
-                        write to its own code, or jump into its data. Both break
-                        those permissions, and the hardware stops the program,
-                        using permission bits kept in the
-                        <a href="05-physical-ram-and-address-translation.html"
-                            >page table</a
-                        >.
-                    </p>
-                    <p>
-                        Two of the printed pointers deserve attention.
-                        <code>small</code>'s 12-byte buffer is in
-                        <code>[heap]</code>. <code>big</code>'s 1 MiB buffer is
-                        in a mapping of its own. Both are "on the heap" in the
-                        Rust sense, because both came from the allocator
-                        <span class="tag tag-comp">Allocator</span>. The
-                        allocator chose where to put each one, and for large
-                        blocks glibc asks the kernel for a fresh mapping. The
-                        label <code>[heap]</code> in the map names one
-                        particular range, not every heap allocation.
-                    </p>
+<h2 id="reading-the-map">Reading the map</h2>
+<p>
+  Look at what a "process" turned out to be. It is not one block with a stack at one end and a heap at the other. It is a collection of separate mappings.
+</p>
+<p>
+  This one has the executable in four pieces, three shared libraries and a <code>[heap]</code> range. It also has two stacks (one per thread), a large anonymous mapping holding one vector, and a few pages the kernel supplies. Each mapping has its own permissions:
+</p>
+<ul>
+  <li><code>r</code> read, <code>w</code> write, <code>x</code> execute, or <code>-</code> for "not allowed";</li>
+  <li><code>p</code> private (copy-on-write) or <code>s</code> shared with other processes.</li>
+</ul>
+<p>
+  Machine code is <code>r-x</code>: readable and executable, but not writable. Data is <code>rw-</code>: writable but not executable. A program might try to write to its own code, or jump into its data. Both break those permissions, and the hardware stops the program, using permission bits kept in the <a href="05-physical-ram-and-address-translation.html">page table</a>.
+</p>
+<p>
+  Two of the printed pointers deserve attention. <code>small</code>'s 12-byte buffer is in <code>[heap]</code>. <code>big</code>'s 1 MiB buffer is in a mapping of its own. Both are "on the heap" in the Rust sense, because both came from the allocator <span class="tag tag-comp">Allocator</span>. The allocator chose where to put each one, and for large blocks glibc asks the kernel for a fresh mapping. The label <code>[heap]</code> in the map names one particular range, not every heap allocation.
+</p>
 
-                    <div class="aside aside--wrong">
-                        <p class="aside__h">A tempting picture that is wrong</p>
-                        <p>
-                            "A process has one stack at the top and one heap at
-                            the bottom, growing towards each other." That is a
-                            common textbook drawing of an old, single-threaded
-                            process. A real process has a stack per thread,
-                            several heap-like areas, and many other mappings in
-                            between.
-                        </p>
-                    </div>
+<div class="aside aside--wrong">
+  <p class="aside__h">A tempting picture that is wrong</p>
+  <p>"A process has one stack at the top and one heap at the bottom, growing towards each other." That is a common textbook drawing of an old, single-threaded process. A real process has a stack per thread, several heap-like areas, and many other mappings in between.</p>
+</div>
 
-                    <h2 id="mapped-is-not-the-same-as-in-ram">
-                        Mapped is not the same as in RAM
-                    </h2>
-                    <p>
-                        The address space is about 128 TiB. A laptop has perhaps
-                        16 GiB of RAM. Even mapped ranges are not necessarily
-                        using RAM. When the kernel maps an anonymous range, it
-                        only reserves the addresses; it gives a page real memory
-                        the first time the program writes to it
-                        <a
-                            class="src"
-                            href="https://www.kernel.org/doc/html/latest/admin-guide/mm/concepts.html"
-                            >kernel docs</a
-                        >. This is called
-                        <a
-                            href="https://en.wikipedia.org/wiki/Demand_paging"
-                            class="ext"
-                            >demand paging</a
-                        >.
-                    </p>
-                    <p>
-                        You can watch it happen.
-                        <code>examples/rss.rs</code> creates a 64 MiB vector of
-                        zeros, then writes one byte into every 4096-byte page.
-                        Before and after the writes, it reads the kernel's count
-                        of resident memory (<code>Rss</code>) for that mapping:
-                    </p>
-                    <div class="table-wrap">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Moment</th>
-                                    <th>Mapped size</th>
-                                    <th>Resident in RAM</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>
-                                        After
-                                        <code>vec![0u8; 64 &lt;&lt; 20]</code>
-                                    </td>
-                                    <td>65 540 kB</td>
-                                    <td>4 kB</td>
-                                </tr>
-                                <tr>
-                                    <td>After writing one byte per page</td>
-                                    <td>65 540 kB</td>
-                                    <td>65 536 kB</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <p class="note-sm">
-                        Real run, values from <code>/proc/self/smaps</code>,
-                        Linux x86-64. Exact numbers depend on the kernel and
-                        allocator.
-                    </p>
-                    <p>
-                        The vector existed, had a length of 64 MiB and could be
-                        read, but almost none of it was in RAM until it was
-                        written. The address space describes what a process
-                        <em>may</em> use. Which parts currently sit in RAM is a
-                        separate question. The kernel can change the answer at
-                        any time, for example by moving rarely used pages out to
-                        swap.
-                    </p>
+<h2 id="mapped-is-not-the-same-as-in-ram">Mapped is not the same as in RAM</h2>
+<p>
+  The address space is about 128 TiB. A laptop has perhaps 16 GiB of RAM. Even mapped ranges are not necessarily using RAM. When the kernel maps an anonymous range, it only reserves the addresses; it gives a page real memory the first time the program writes to it <a class="src" href="https://www.kernel.org/doc/html/latest/admin-guide/mm/concepts.html">kernel docs</a>. This is called <a href="https://en.wikipedia.org/wiki/Demand_paging" class="ext">demand paging</a>.
+</p>
+<p>You can watch it happen. <code>examples/rss.rs</code> creates a 64 MiB vector of zeros, then writes one byte into every 4096-byte page. Before and after the writes, it reads the kernel's count of resident memory (<code>Rss</code>) for that mapping:</p>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Moment</th><th>Mapped size</th><th>Resident in RAM</th></tr></thead>
+    <tbody>
+      <tr><td>After <code>vec![0u8; 64 &lt;&lt; 20]</code></td><td>65 540 kB</td><td>4 kB</td></tr>
+      <tr><td>After writing one byte per page</td><td>65 540 kB</td><td>65 536 kB</td></tr>
+    </tbody>
+  </table>
+</div>
+<p class="note-sm">Real run, values from <code>/proc/self/smaps</code>, Linux x86-64. Exact numbers depend on the kernel and allocator.</p>
+<p>
+  The vector existed, had a length of 64 MiB and could be read, but almost none of it was in RAM until it was written. The address space describes what a process <em>may</em> use. Which parts currently sit in RAM is a separate question. The kernel can change the answer at any time, for example by moving rarely used pages out to swap.
+</p>
 
-                    <h2 id="who-decides-the-layout">Who decides the layout?</h2>
-                    <p>Several parties decide, each for its own part:</p>
-                    <ul>
-                        <li>
-                            The linker decides the layout inside the executable.
-                        </li>
-                        <li>
-                            The kernel decides where mappings go, within its
-                            rules and with randomisation.
-                        </li>
-                        <li>The dynamic loader places the libraries.</li>
-                        <li>
-                            The allocator decides where each heap block goes.
-                        </li>
-                        <li>The thread library places thread stacks.</li>
-                    </ul>
-                    <p>
-                        Rust the language decides none of this; it does not
-                        define a memory map at all. The map shown here is real,
-                        but it comes from one machine; other systems lay things
-                        out differently.
-                    </p>
+<h2 id="who-decides-the-layout">Who decides the layout?</h2>
+<p>Several parties decide, each for its own part:</p>
+<ul>
+  <li>The linker decides the layout inside the executable.</li>
+  <li>The kernel decides where mappings go, within its rules and with randomisation.</li>
+  <li>The dynamic loader places the libraries.</li>
+  <li>The allocator decides where each heap block goes.</li>
+  <li>The thread library places thread stacks.</li>
+</ul>
+<p>
+  Rust the language decides none of this; it does not define a memory map at all. The map shown here is real, but it comes from one machine; other systems lay things out differently.
+</p>
 
-                    <section class="keep" aria-labelledby="keep-h">
-                        <h2 id="keep-h">What to remember</h2>
-                        <ol>
-                            <li>
-                                An address space is a set of separate mappings,
-                                each with permissions: code, data, libraries,
-                                heap areas, and one stack per thread.
-                            </li>
-                            <li>
-                                "Heap-allocated" means "from the allocator"; the
-                                allocator can use <code>[heap]</code> or other
-                                mappings.
-                            </li>
-                            <li>
-                                Mapped addresses are not necessarily backed by
-                                RAM; pages get memory when they are first used.
-                            </li>
-                        </ol>
-                    </section>
+<section class="keep" aria-labelledby="keep-h">
+  <h2 id="keep-h">What to remember</h2>
+  <ol>
+    <li>An address space is a set of separate mappings, each with permissions: code, data, libraries, heap areas, and one stack per thread.</li>
+    <li>"Heap-allocated" means "from the allocator"; the allocator can use <code>[heap]</code> or other mappings.</li>
+    <li>Mapped addresses are not necessarily backed by RAM; pages get memory when they are first used.</li>
+  </ol>
+</section>
 
-                    <section class="test" aria-labelledby="test-h">
-                        <h2 id="test-h">Check your understanding</h2>
-                        <details>
-                            <summary>
-                                The 1 MiB vector's buffer is not inside
-                                <code>[heap]</code>. Is it still a heap
-                                allocation?
-                            </summary>
-                            <div>
-                                <p>
-                                    Yes. It came from the allocator, which is
-                                    what "heap allocation" means. For large
-                                    blocks, glibc's allocator uses a separate
-                                    anonymous mapping.
-                                </p>
-                            </div>
-                        </details>
-                        <details>
-                            <summary>
-                                Why do the two runs show different addresses for
-                                the same regions?
-                            </summary>
-                            <div>
-                                <p>
-                                    Linux randomises where it places mappings
-                                    each time a program starts. Each run is a
-                                    separate process with its own address space
-                                    anyway, so the numbers were never shared.
-                                </p>
-                            </div>
-                        </details>
-                        <details>
-                            <summary>
-                                A program maps 1 GiB and never touches it. How
-                                much RAM does that use?
-                            </summary>
-                            <div>
-                                <p>
-                                    Almost none. The addresses are reserved, but
-                                    the kernel gives a page physical memory only
-                                    when it is first used.
-                                </p>
-                            </div>
-                        </details>
-                    </section>
+<section class="test" aria-labelledby="test-h">
+  <h2 id="test-h">Check your understanding</h2>
+  <details>
+    <summary>The 1 MiB vector's buffer is not inside <code>[heap]</code>. Is it still a heap allocation?</summary>
+    <div><p>Yes. It came from the allocator, which is what "heap allocation" means. For large blocks, glibc's allocator uses a separate anonymous mapping.</p></div>
+  </details>
+  <details>
+    <summary>Why do the two runs show different addresses for the same regions?</summary>
+    <div><p>Linux randomises where it places mappings each time a program starts. Each run is a separate process with its own address space anyway, so the numbers were never shared.</p></div>
+  </details>
+  <details>
+    <summary>A program maps 1 GiB and never touches it. How much RAM does that use?</summary>
+    <div><p>Almost none. The addresses are reserved, but the kernel gives a page physical memory only when it is first used.</p></div>
+  </details>
+</section>
 
-                    <p class="related">
-                        <b>Related:</b>
-                        <a href="01-what-is-a-program.html"
-                            >how the executable got mapped</a
-                        >
-                        ·
-                        <a href="06-threads-and-their-stacks.html"
-                            >two stacks in one process</a
-                        >
-                        ·
-                        <a href="10-string-and-vec-memory.html"
-                            >where <code>Vec</code> buffers come from</a
-                        >
-                    </p>
+<p class="related"><b>Related:</b> <a href="01-what-is-a-program.html">how the executable got mapped</a> · <a href="06-threads-and-their-stacks.html">two stacks in one process</a> · <a href="10-string-and-vec-memory.html">where <code>Vec</code> buffers come from</a></p>
 
-                    <p>
-                        <b>Next question:</b> the program used the address
-                        <code>579e63956d50</code>.
-                        <a href="05-physical-ram-and-address-translation.html"
-                            >How does that number become a place in the RAM
-                            chips?</a
-                        >
-                    </p>
-                    <nav class="pager" aria-label="Previous and next">
-                        <a
-                            class="pager__prev"
-                            href="03-programs-processes-and-the-kernel.html"
-                            rel="prev"
-                            ><span class="pager__dir">← Previous</span
-                            ><span class="pager__q"
-                                >What does a program get when it starts
-                                running?</span
-                            ></a
-                        >
-                        <a
-                            class="pager__next"
-                            href="05-physical-ram-and-address-translation.html"
-                            rel="next"
-                            ><span class="pager__dir">Next →</span
-                            ><span class="pager__q"
-                                >How does a virtual address reach physical
-                                RAM?</span
-                            ></a
-                        >
-                    </nav>
-                </article>
-                <footer class="foot">
-                    <p>
-                        Observed values, such as addresses, sizes, assembly and
-                        program output, come from one machine. It runs Linux 7.0
-                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
-                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
-                        limit. Addresses change on every run, and other systems,
-                        toolchains and allocators can differ. Details:
-                        <a href="../reference/sources.html">Sources</a> ·
-                        <code>examples/OUTPUT.txt</code>.
-                    </p>
-                </footer>
-            </main>
-            <nav class="otp" aria-label="On this page">
-                <p class="otp__h">On this page</p>
-                <ol class="otp__list">
-                    <li class="lv2"><a href="#a-real-map">A real map</a></li>
-                    <li class="lv2">
-                        <a href="#reading-the-map">Reading the map</a>
-                    </li>
-                    <li class="lv2">
-                        <a href="#mapped-is-not-the-same-as-in-ram"
-                            >Mapped is not the same as in RAM</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a href="#who-decides-the-layout"
-                            >Who decides the layout?</a
-                        >
-                    </li>
-                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
-                    <li class="lv2">
-                        <a href="#test-h">Check your understanding</a>
-                    </li>
-                </ol>
-            </nav>
-        </div>
-    </body>
+<p><b>Next question:</b> the program used the address <code>579e63956d50</code>. <a href="05-physical-ram-and-address-translation.html">How does that number become a place in the RAM chips?</a></p>
+<nav class="pager" aria-label="Previous and next">
+<a class="pager__prev" href="03-programs-processes-and-the-kernel.html" rel="prev"><span class="pager__dir">← Previous</span><span class="pager__q">What does a program get when it starts running?</span></a>
+<a class="pager__next" href="05-physical-ram-and-address-translation.html" rel="next"><span class="pager__dir">Next →</span><span class="pager__q">How does a virtual address reach physical RAM?</span></a>
+</nav>
+</article>
+<footer class="foot"><p>Observed values, such as addresses, sizes, assembly and program output, come from one machine. It runs Linux 7.0 (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack limit. Addresses change on every run, and other systems, toolchains and allocators can differ. Details: <a href="../reference/sources.html">Sources</a> · <code>examples/OUTPUT.txt</code>.</p></footer>
+</main>
+<nav class="otp" aria-label="On this page"><p class="otp__h">On this page</p><ol class="otp__list"><li class="lv2"><a href="#a-real-map">A real map</a></li><li class="lv2"><a href="#reading-the-map">Reading the map</a></li><li class="lv2"><a href="#mapped-is-not-the-same-as-in-ram">Mapped is not the same as in RAM</a></li><li class="lv2"><a href="#who-decides-the-layout">Who decides the layout?</a></li><li class="lv2"><a href="#keep-h">What to remember</a></li><li class="lv2"><a href="#test-h">Check your understanding</a></li></ol></nav>
+</div>
+</body>
 </html>

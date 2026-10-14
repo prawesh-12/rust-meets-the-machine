@@ -1,221 +1,67 @@
 <!doctype html>
 <html lang="en" class="no-js">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>
-            What happens, layer by layer, when total(&amp;scores) runs? — How a
-            Rust program meets the machine
-        </title>
-        <meta
-            name="description"
-            content="Every layer at once, one event at a time: what the Rust rules, the values and heap, the thread&#x27;s stack, the address space and the CPU are doing while sum.rs builds the scores vector and calls total(&amp;amp;scores). Ends with what the optimised binary really contains."
-        />
-        <link rel="stylesheet" href="../assets/css/site.css" />
-        <script src="../assets/js/site.js"></script>
-        <script src="../assets/js/diagrams.js" defer></script>
-    </head>
-    <body>
-        <a class="skip" href="#main">Skip to the text</a>
-        <header class="top">
-            <a class="top__title" href="../index.html"
-                >How a Rust program meets the machine</a
-            >
-            <span class="top__here">15 · One call, every layer</span>
-            <span class="top__spacer"></span>
-            <button
-                class="top__btn"
-                type="button"
-                data-toc-toggle
-                aria-expanded="false"
-                aria-controls="toc"
-            >
-                Contents
-            </button>
-        </header>
-        <div class="shell">
-            <nav class="toc" id="toc" aria-label="Contents">
-                <a class="toc__home" href="../index.html">The whole map</a>
-                <p class="toc__group">Before your code runs</p>
-                <ol>
-                    <li>
-                        <a href="01-what-is-a-program.html"
-                            ><span class="n">01</span
-                            ><span>What a program is</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="02-how-a-cpu-runs-code.html"
-                            ><span class="n">02</span
-                            ><span>How a CPU runs code</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="03-programs-processes-and-the-kernel.html"
-                            ><span class="n">03</span
-                            ><span>Processes and the kernel</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Addresses</p>
-                <ol>
-                    <li>
-                        <a href="04-virtual-memory.html"
-                            ><span class="n">04</span
-                            ><span>Inside an address space</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="05-physical-ram-and-address-translation.html"
-                            ><span class="n">05</span
-                            ><span>From virtual address to RAM</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="06-threads-and-their-stacks.html"
-                            ><span class="n">06</span
-                            ><span>Threads and their stacks</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="07-registers-caches-and-a-memory-read.html"
-                            ><span class="n">07</span
-                            ><span>Caches and one load</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Calls and data</p>
-                <ol>
-                    <li>
-                        <a href="08-function-calls-and-stack-frames.html"
-                            ><span class="n">08</span
-                            ><span>Calls and stack frames</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="09-rust-values-stack-heap-and-box.html"
-                            ><span class="n">09</span
-                            ><span>Values, stack, heap, Box</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="10-string-and-vec-memory.html"
-                            ><span class="n">10</span
-                            ><span>String and Vec</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Rust's rules</p>
-                <ol>
-                    <li>
-                        <a href="11-ownership-moves-clone-and-drop.html"
-                            ><span class="n">11</span
-                            ><span>Ownership, moves, drop</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="12-references-borrowing-and-lifetimes.html"
-                            ><span class="n">12</span
-                            ><span>References and lifetimes</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="13-iterators-and-following-data.html"
-                            ><span class="n">13</span><span>Iterators</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="14-memory-bugs-and-rust-safety.html"
-                            ><span class="n">14</span
-                            ><span>Memory bugs and safety</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">All together</p>
-                <ol>
-                    <li>
-                        <a
-                            href="15-follow-one-example-end-to-end.html"
-                            aria-current="page"
-                            ><span class="n">15</span
-                            ><span>One call, every layer</span></a
-                        >
-                        <ol class="toc__sub">
-                            <li class="lv2">
-                                <a
-                                    href="#what-the-optimised-program-actually-does"
-                                    >What the optimised program actually does</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#which-layer-decides-what"
-                                    >Which layer decides what</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#keep-h">What to remember</a>
-                            </li>
-                            <li class="lv2">
-                                <a href="#test-h">Check your understanding</a>
-                            </li>
-                        </ol>
-                    </li>
-                </ol>
-                <p class="toc__group">Reference</p>
-                <ul class="toc__ref">
-                    <li><a href="../reference/glossary.html">Glossary</a></li>
-                    <li><a href="../reference/sources.html">Sources</a></li>
-                    <li>
-                        <a href="../reference/concept-map.html">Concept map</a>
-                    </li>
-                </ul>
-            </nav>
-            <main id="main">
-                <article class="page">
-                    <header class="opening">
-                        <div class="opening__meta">
-                            <span class="opening__num">15</span
-                            ><span class="tag tag-rust">Rust</span>
-                            <span class="tag tag-comp"
-                                >Compiler &amp; runtime</span
-                            >
-                            <span class="tag tag-os">Operating system</span>
-                            <span class="tag tag-hw">CPU &amp; hardware</span>
-                        </div>
-                        <h1>
-                            What happens, layer by layer, when
-                            <code>total(&amp;scores)</code> runs?
-                        </h1>
-                        <p class="why">
-                            A running program uses every layer at once: Rust's
-                            rules, values on the heap, a thread's stack, the
-                            address space and the CPU. Here the whole example
-                            program runs one event at a time, with every layer
-                            side by side. At each moment you can see which layer
-                            does the work, and which ones are not involved at
-                            all.
-                        </p>
-                    </header>
-                    <ul
-                        class="legend"
-                        aria-label="Which layer each colour means"
-                    >
-                        <li><span class="sw sw-rust"></span>Rust language</li>
-                        <li>
-                            <span class="sw sw-comp"></span>Compiler &amp;
-                            runtime library
-                        </li>
-                        <li><span class="sw sw-os"></span>Operating system</li>
-                        <li>
-                            <span class="sw sw-hw"></span>CPU &amp; hardware
-                        </li>
-                    </ul>
-                    <div class="codeblock">
-                        <div class="codeblock__label">
-                            <span><code>examples/sum.rs</code></span
-                            ><span>prints <code>60</code></span>
-                        </div>
-                        <pre><code><span class="k">fn</span> total(values: &amp;Vec&lt;i32&gt;) -&gt; i32 {
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What happens, layer by layer, when total(&amp;scores) runs? — How a Rust program meets the machine</title>
+<meta name="description" content="Every layer at once, one event at a time: what the Rust rules, the values and heap, the thread&#x27;s stack, the address space and the CPU are doing while sum.rs builds the scores vector and calls total(&amp;amp;scores). Ends with what the optimised binary really contains.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/diagrams.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the text</a>
+<header class="top">
+  <a class="top__title" href="../index.html">How a Rust program meets the machine</a>
+  <span class="top__here">15 · One call, every layer</span>
+  <span class="top__spacer"></span>
+  <button class="top__btn" type="button" data-toc-toggle aria-expanded="false" aria-controls="toc">Contents</button>
+</header>
+<div class="shell">
+<nav class="toc" id="toc" aria-label="Contents">
+<a class="toc__home" href="../index.html">The whole map</a>
+<p class="toc__group">Before your code runs</p><ol>
+<li><a href="01-what-is-a-program.html"><span class="n">01</span><span>What a program is</span></a></li>
+<li><a href="02-how-a-cpu-runs-code.html"><span class="n">02</span><span>How a CPU runs code</span></a></li>
+<li><a href="03-programs-processes-and-the-kernel.html"><span class="n">03</span><span>Processes and the kernel</span></a></li>
+</ol>
+<p class="toc__group">Addresses</p><ol>
+<li><a href="04-virtual-memory.html"><span class="n">04</span><span>Inside an address space</span></a></li>
+<li><a href="05-physical-ram-and-address-translation.html"><span class="n">05</span><span>From virtual address to RAM</span></a></li>
+<li><a href="06-threads-and-their-stacks.html"><span class="n">06</span><span>Threads and their stacks</span></a></li>
+<li><a href="07-registers-caches-and-a-memory-read.html"><span class="n">07</span><span>Caches and one load</span></a></li>
+</ol>
+<p class="toc__group">Calls and data</p><ol>
+<li><a href="08-function-calls-and-stack-frames.html"><span class="n">08</span><span>Calls and stack frames</span></a></li>
+<li><a href="09-rust-values-stack-heap-and-box.html"><span class="n">09</span><span>Values, stack, heap, Box</span></a></li>
+<li><a href="10-string-and-vec-memory.html"><span class="n">10</span><span>String and Vec</span></a></li>
+</ol>
+<p class="toc__group">Rust's rules</p><ol>
+<li><a href="11-ownership-moves-clone-and-drop.html"><span class="n">11</span><span>Ownership, moves, drop</span></a></li>
+<li><a href="12-references-borrowing-and-lifetimes.html"><span class="n">12</span><span>References and lifetimes</span></a></li>
+<li><a href="13-iterators-and-following-data.html"><span class="n">13</span><span>Iterators</span></a></li>
+<li><a href="14-memory-bugs-and-rust-safety.html"><span class="n">14</span><span>Memory bugs and safety</span></a></li>
+</ol>
+<p class="toc__group">All together</p><ol>
+<li><a href="15-follow-one-example-end-to-end.html" aria-current="page"><span class="n">15</span><span>One call, every layer</span></a><ol class="toc__sub"><li class="lv2"><a href="#what-the-optimised-program-actually-does">What the optimised program actually does</a></li><li class="lv2"><a href="#which-layer-decides-what">Which layer decides what</a></li><li class="lv2"><a href="#keep-h">What to remember</a></li><li class="lv2"><a href="#test-h">Check your understanding</a></li></ol></li>
+</ol>
+<p class="toc__group">Reference</p><ul class="toc__ref">
+<li><a href="../reference/glossary.html">Glossary</a></li>
+<li><a href="../reference/sources.html">Sources</a></li>
+<li><a href="../reference/concept-map.html">Concept map</a></li>
+</ul>
+</nav>
+<main id="main">
+<article class="page">
+<header class="opening">
+  <div class="opening__meta"><span class="opening__num">15</span><span class="tag tag-rust">Rust</span> <span class="tag tag-comp">Compiler &amp; runtime</span> <span class="tag tag-os">Operating system</span> <span class="tag tag-hw">CPU &amp; hardware</span></div>
+  <h1>What happens, layer by layer, when <code>total(&amp;scores)</code> runs?</h1>
+  <p class="why">A running program uses every layer at once: Rust's rules, values on the heap, a thread's stack, the address space and the CPU. Here the whole example program runs one event at a time, with every layer side by side. At each moment you can see which layer does the work, and which ones are not involved at all.</p>
+</header>
+<ul class="legend" aria-label="Which layer each colour means"><li><span class="sw sw-rust"></span>Rust language</li><li><span class="sw sw-comp"></span>Compiler &amp; runtime library</li><li><span class="sw sw-os"></span>Operating system</li><li><span class="sw sw-hw"></span>CPU &amp; hardware</li></ul>
+<div class="codeblock">
+  <div class="codeblock__label"><span><code>examples/sum.rs</code></span><span>prints <code>60</code></span></div>
+<pre><code><span class="k">fn</span> total(values: &amp;Vec&lt;i32&gt;) -&gt; i32 {
     <span class="k">let mut</span> sum = 0;
     <span class="k">for</span> v <span class="k">in</span> values.iter() {
         sum += v;
@@ -229,264 +75,56 @@
     <span class="k">let</span> t = total(&amp;scores);
     println!(<span class="k">"{t}"</span>);
 }</code></pre>
-                    </div>
+</div>
 
-                    <figure
-                        class="fig"
-                        data-fig="trace"
-                        data-label="end-to-end trace"
-                        data-play
-                    >
-                        <div class="fig__head">
-                            <p class="fig__title">
-                                From <code>rustc</code> to process exit
-                            </p>
-                            <span class="fig__kind"
-                                >Illustrative execution trace · based on
-                                recorded runs</span
-                            >
-                        </div>
-                        <div class="fig__body">
-                            <div class="controls" data-stepper-controls></div>
-                            <p class="now-says" aria-live="polite"></p>
-                            <p class="note-sm no-js-only">
-                                The rows show the last step. The numbered list
-                                below the rows goes through every step in order.
-                            </p>
-                            <ul class="layers">
-                                <li class="l-src" data-now="">
-                                    <span class="lh">Source</span
-                                    ><span
-                                        class="lv"
-                                        data-vals='["the whole file: rustc -O sum.rs", "before main: start-up code", "let mut scores = vec![10, 20];", "scores.push(30);", "let t = total(&amp;scores);", "for v in values.iter() {", "sum += v;   (v → scores[0])", "sum += v;   (v → scores[1], then scores[2])", "sum   (end of total)", "println!(\"{t}\");", "}   (end of main)"]'
-                                        >} (end of main)</span
-                                    >
-                                </li>
-                                <li class="l-rust" data-now="0 2 3 4 5 6 8 10">
-                                    <span class="lh">Rust rules</span
-                                    ><span
-                                        class="lv"
-                                        data-vals='["Compile time: scores is owned by main; &amp;scores is a shared borrow; push needs &amp;mut but no borrow is live then. Accepted.", "No Rust rules act at run time.", "scores owns the Vec, and through it the buffer.", "push borrows scores mutably for the call. No other borrow exists, so this was allowed.", "values: &amp;Vec&lt;i32&gt;, a shared borrow that lasts until its last use inside total.", "The iterator borrows the Vec; each v will be a &amp;i32 into the buffer.", "v is a shared reference to element 0.", "v refers to element 1, then 2. scores still cannot be changed.", "The iterator and values are no longer used: the borrows have ended.", "t is a plain i32 (Copy). scores is still owned by main.", "scores goes out of scope and is dropped: its buffer is freed once."]'
-                                        >scores goes out of scope and is
-                                        dropped: its buffer is freed once.</span
-                                    >
-                                </li>
-                                <li
-                                    class="l-comp"
-                                    data-now="0 2 3 4 5 6 7 8 9 10"
-                                >
-                                    <span class="lh">Values and heap</span
-                                    ><span
-                                        class="lv"
-                                        data-vals='["Layout decided: the Vec handle is 24 bytes (field order is the compiler&#x27;s choice).", "No heap block for scores yet.", "__rust_alloc(8, 4): an 8-byte block (…d50). Handle: ptr …d50, len 2, cap 2.", "len == cap, so grow_one asks the allocator for room for 4. This run: same address. 30 written; len 3, cap 4.", "values holds the address of the handle (8 bytes).", "Iterator (16 bytes): cursor at …d50, end at …d5c.", "Reads the 4 bytes at …d50: 10.", "Reads …d54 (20) and …d58 (30). sum = 60.", "Iterator dropped. 60 is the return value.", "Formatting writes \"60\\n\" into an output buffer.", "Drop: __rust_dealloc(ptr, 16, 4). The block goes back to the allocator."]'
-                                        >Drop: __rust_dealloc(ptr, 16, 4). The
-                                        block goes back to the allocator.</span
-                                    >
-                                </li>
-                                <li class="l-os" data-now="1 2 3 4 8 9 10">
-                                    <span class="lh">Thread and stack</span
-                                    ><span
-                                        class="lv"
-                                        data-vals='["No thread yet.", "The kernel creates the main thread with its stack (8 MiB limit). Frames: _start → libc start-up → lang_start → main.", "main&#x27;s frame holds the handle (or registers do).", "A frame for grow_one comes and goes.", "Unoptimised: a frame for total. Optimised (this file with -O): total is inlined into main, no call.", "The iterator lives in total&#x27;s frame or in registers.", "sum lives in a register.", "sum lives in a register.", "ret pops the return address; total&#x27;s frame bytes are left behind.", "Frames for std&#x27;s printing code reuse that space.", "main returns; start-up code calls exit."]'
-                                        >main returns; start-up code calls
-                                        exit.</span
-                                    >
-                                </li>
-                                <li class="l-os" data-now="0 1 2 6 9 10">
-                                    <span class="lh">Address space and OS</span
-                                    ><span
-                                        class="lv"
-                                        data-vals='["Nothing runs yet: the result is an ELF file on disk.", "execve maps the executable, ld.so, libc and the [stack] region. Pages are loaded on first touch.", "The block is inside [heap], which the allocator got from the kernel earlier (brk).", "Grown in place, so no new mapping and no move.", "No change.", "No change.", "Virtual …d50 must become a physical address: page tables via the MMU.", "Same 4 KiB page: same translation.", "No change.", "write(1, \"60\\n\", 3): a system call. The CPU enters the kernel, which hands the bytes to the terminal.", "On exit the kernel tears down the whole address space and frees every frame, including the heap."]'
-                                        >On exit the kernel tears down the whole
-                                        address space and frees every frame,
-                                        including the heap.</span
-                                    >
-                                </li>
-                                <li class="l-hw" data-now="1 2 3 4 5 6 7 8 9">
-                                    <span class="lh">CPU and caches</span
-                                    ><span
-                                        class="lv"
-                                        data-vals='["No instructions run.", "rip starts at the entry point _start.", "-O build: one 8-byte store writes 10 and 20 together.", "A 4-byte store writes 30 at …d58.", "Unoptimised: rdi = address of scores, then call.", "Cursor and end pointers go into registers.", "TLB checked for the page; L1 checked for the 64-byte line. The bytes were just written, so the line is very likely still cached.", "Same line, same page: L1 hit, TLB hit, most likely.", "eax = 60, then ret.", "syscall instruction: switch to kernel mode and back.", "Last instructions of this process."]'
-                                        >Last instructions of this
-                                        process.</span
-                                    >
-                                </li>
-                            </ul>
-                            <ol class="steps">
-                                <li>
-                                    <b>Build.</b> The compiler checks
-                                    <a
-                                        href="11-ownership-moves-clone-and-drop.html"
-                                        >ownership</a
-                                    >
-                                    and
-                                    <a
-                                        href="12-references-borrowing-and-lifetimes.html"
-                                        >borrowing</a
-                                    >
-                                    and decides layouts. No Rust rule is checked
-                                    after this point.
-                                </li>
-                                <li>
-                                    <b>Start.</b> The kernel creates the
-                                    <a
-                                        href="03-programs-processes-and-the-kernel.html"
-                                        >process</a
-                                    >
-                                    and its
-                                    <a href="06-threads-and-their-stacks.html"
-                                        >main thread</a
-                                    >,
-                                    <a href="04-virtual-memory.html"
-                                        >maps the file</a
-                                    >, and jumps to the entry point. Rust's
-                                    <code>main</code> runs after the C library's
-                                    and Rust's
-                                    <a href="01-what-is-a-program.html"
-                                        >start-up code</a
-                                    >.
-                                </li>
-                                <li>
-                                    <b><code>vec![10, 20]</code>.</b> The
-                                    <a
-                                        href="09-rust-values-stack-heap-and-box.html"
-                                        >allocator</a
-                                    >
-                                    hands out an 8-byte block from the heap
-                                    region; <code>scores</code>'s
-                                    <a href="10-string-and-vec-memory.html"
-                                        >handle</a
-                                    >
-                                    records it.
-                                </li>
-                                <li>
-                                    <b><code>push(30)</code>.</b> The buffer is
-                                    full, so it
-                                    <a href="10-string-and-vec-memory.html"
-                                        >grows</a
-                                    >; in this run it grew in place.
-                                </li>
-                                <li>
-                                    <b><code>total(&amp;scores)</code>.</b> A
-                                    <a
-                                        href="12-references-borrowing-and-lifetimes.html"
-                                        >shared borrow</a
-                                    >
-                                    is passed: an address. Whether there is a
-                                    call and a
-                                    <a
-                                        href="08-function-calls-and-stack-frames.html"
-                                        >frame</a
-                                    >
-                                    depends on optimisation.
-                                </li>
-                                <li>
-                                    <b><code>values.iter()</code>.</b> A small
-                                    <a
-                                        href="13-iterators-and-following-data.html"
-                                        >iterator</a
-                                    >
-                                    value with a cursor into the buffer.
-                                </li>
-                                <li>
-                                    <b>First element.</b> The load is
-                                    <a
-                                        href="05-physical-ram-and-address-translation.html"
-                                        >translated by the MMU</a
-                                    >
-                                    and served by the
-                                    <a
-                                        href="07-registers-caches-and-a-memory-read.html"
-                                        >cache hierarchy</a
-                                    >.
-                                </li>
-                                <li>
-                                    <b>Next elements.</b> Same page, same cache
-                                    line: the
-                                    <a
-                                        href="07-registers-caches-and-a-memory-read.html"
-                                        >fast path</a
-                                    >.
-                                </li>
-                                <li>
-                                    <b>Return.</b> The borrows end,
-                                    <code>total</code>'s
-                                    <a
-                                        href="08-function-calls-and-stack-frames.html"
-                                        >frame</a
-                                    >
-                                    is abandoned, 60 is in <code>eax</code>.
-                                </li>
-                                <li>
-                                    <b><code>println!</code>.</b> The text
-                                    reaches the terminal through a
-                                    <a
-                                        href="03-programs-processes-and-the-kernel.html"
-                                        >system call</a
-                                    >
-                                    into the kernel.
-                                </li>
-                                <li>
-                                    <b>End of <code>main</code>.</b>
-                                    <code>scores</code> is
-                                    <a
-                                        href="11-ownership-moves-clone-and-drop.html"
-                                        >dropped</a
-                                    >
-                                    and its buffer freed to the allocator; then
-                                    the process exits and the kernel releases
-                                    its whole
-                                    <a href="04-virtual-memory.html"
-                                        >address space</a
-                                    >.
-                                </li>
-                            </ol>
-                        </div>
-                        <aside class="leaves-out leaves-out--below">
-                            <h4>What this picture leaves out</h4>
-                            <ul>
-                                <li>
-                                    Timing. Steps are in order but not to scale:
-                                    the start-up step alone runs far more
-                                    instructions than the rest.
-                                </li>
-                                <li>
-                                    Other threads, interrupts and the
-                                    <a
-                                        href="03-programs-processes-and-the-kernel.html"
-                                        >scheduler</a
-                                    >, which can pause this thread between any
-                                    two instructions.
-                                </li>
-                                <li>
-                                    The trace mixes builds on purpose: where the
-                                    unoptimised and optimised programs differ,
-                                    the row says which one it describes. The
-                                    next section shows the optimised program as
-                                    it really is.
-                                </li>
-                            </ul>
-                        </aside>
-                    </figure>
+<figure class="fig" data-fig="trace" data-label="end-to-end trace" data-play>
+  <div class="fig__head">
+    <p class="fig__title">From <code>rustc</code> to process exit</p>
+    <span class="fig__kind">Illustrative execution trace · based on recorded runs</span>
+  </div>
+  <div class="fig__body">
+    <div class="controls" data-stepper-controls></div>
+    <p class="now-says" aria-live="polite"></p>
+    <p class="note-sm no-js-only">The rows show the last step. The numbered list below the rows goes through every step in order.</p>
+    <ul class="layers">
+      <li class="l-src" data-now=""><span class="lh">Source</span><span class="lv" data-vals="[&quot;the whole file: rustc -O sum.rs&quot;, &quot;before main: start-up code&quot;, &quot;let mut scores = vec![10, 20];&quot;, &quot;scores.push(30);&quot;, &quot;let t = total(&amp;scores);&quot;, &quot;for v in values.iter() {&quot;, &quot;sum += v;   (v → scores[0])&quot;, &quot;sum += v;   (v → scores[1], then scores[2])&quot;, &quot;sum   (end of total)&quot;, &quot;println!(\&quot;{t}\&quot;);&quot;, &quot;}   (end of main)&quot;]">}   (end of main)</span></li>
+      <li class="l-rust" data-now="0 2 3 4 5 6 8 10"><span class="lh">Rust rules</span><span class="lv" data-vals="[&quot;Compile time: scores is owned by main; &amp;scores is a shared borrow; push needs &amp;mut but no borrow is live then. Accepted.&quot;, &quot;No Rust rules act at run time.&quot;, &quot;scores owns the Vec, and through it the buffer.&quot;, &quot;push borrows scores mutably for the call. No other borrow exists, so this was allowed.&quot;, &quot;values: &amp;Vec&lt;i32&gt;, a shared borrow that lasts until its last use inside total.&quot;, &quot;The iterator borrows the Vec; each v will be a &amp;i32 into the buffer.&quot;, &quot;v is a shared reference to element 0.&quot;, &quot;v refers to element 1, then 2. scores still cannot be changed.&quot;, &quot;The iterator and values are no longer used: the borrows have ended.&quot;, &quot;t is a plain i32 (Copy). scores is still owned by main.&quot;, &quot;scores goes out of scope and is dropped: its buffer is freed once.&quot;]">scores goes out of scope and is dropped: its buffer is freed once.</span></li>
+      <li class="l-comp" data-now="0 2 3 4 5 6 7 8 9 10"><span class="lh">Values and heap</span><span class="lv" data-vals="[&quot;Layout decided: the Vec handle is 24 bytes (field order is the compiler&#x27;s choice).&quot;, &quot;No heap block for scores yet.&quot;, &quot;__rust_alloc(8, 4): an 8-byte block (…d50). Handle: ptr …d50, len 2, cap 2.&quot;, &quot;len == cap, so grow_one asks the allocator for room for 4. This run: same address. 30 written; len 3, cap 4.&quot;, &quot;values holds the address of the handle (8 bytes).&quot;, &quot;Iterator (16 bytes): cursor at …d50, end at …d5c.&quot;, &quot;Reads the 4 bytes at …d50: 10.&quot;, &quot;Reads …d54 (20) and …d58 (30). sum = 60.&quot;, &quot;Iterator dropped. 60 is the return value.&quot;, &quot;Formatting writes \&quot;60\\n\&quot; into an output buffer.&quot;, &quot;Drop: __rust_dealloc(ptr, 16, 4). The block goes back to the allocator.&quot;]">Drop: __rust_dealloc(ptr, 16, 4). The block goes back to the allocator.</span></li>
+      <li class="l-os" data-now="1 2 3 4 8 9 10"><span class="lh">Thread and stack</span><span class="lv" data-vals="[&quot;No thread yet.&quot;, &quot;The kernel creates the main thread with its stack (8 MiB limit). Frames: _start → libc start-up → lang_start → main.&quot;, &quot;main&#x27;s frame holds the handle (or registers do).&quot;, &quot;A frame for grow_one comes and goes.&quot;, &quot;Unoptimised: a frame for total. Optimised (this file with -O): total is inlined into main, no call.&quot;, &quot;The iterator lives in total&#x27;s frame or in registers.&quot;, &quot;sum lives in a register.&quot;, &quot;sum lives in a register.&quot;, &quot;ret pops the return address; total&#x27;s frame bytes are left behind.&quot;, &quot;Frames for std&#x27;s printing code reuse that space.&quot;, &quot;main returns; start-up code calls exit.&quot;]">main returns; start-up code calls exit.</span></li>
+      <li class="l-os" data-now="0 1 2 6 9 10"><span class="lh">Address space and OS</span><span class="lv" data-vals="[&quot;Nothing runs yet: the result is an ELF file on disk.&quot;, &quot;execve maps the executable, ld.so, libc and the [stack] region. Pages are loaded on first touch.&quot;, &quot;The block is inside [heap], which the allocator got from the kernel earlier (brk).&quot;, &quot;Grown in place, so no new mapping and no move.&quot;, &quot;No change.&quot;, &quot;No change.&quot;, &quot;Virtual …d50 must become a physical address: page tables via the MMU.&quot;, &quot;Same 4 KiB page: same translation.&quot;, &quot;No change.&quot;, &quot;write(1, \&quot;60\\n\&quot;, 3): a system call. The CPU enters the kernel, which hands the bytes to the terminal.&quot;, &quot;On exit the kernel tears down the whole address space and frees every frame, including the heap.&quot;]">On exit the kernel tears down the whole address space and frees every frame, including the heap.</span></li>
+      <li class="l-hw" data-now="1 2 3 4 5 6 7 8 9"><span class="lh">CPU and caches</span><span class="lv" data-vals="[&quot;No instructions run.&quot;, &quot;rip starts at the entry point _start.&quot;, &quot;-O build: one 8-byte store writes 10 and 20 together.&quot;, &quot;A 4-byte store writes 30 at …d58.&quot;, &quot;Unoptimised: rdi = address of scores, then call.&quot;, &quot;Cursor and end pointers go into registers.&quot;, &quot;TLB checked for the page; L1 checked for the 64-byte line. The bytes were just written, so the line is very likely still cached.&quot;, &quot;Same line, same page: L1 hit, TLB hit, most likely.&quot;, &quot;eax = 60, then ret.&quot;, &quot;syscall instruction: switch to kernel mode and back.&quot;, &quot;Last instructions of this process.&quot;]">Last instructions of this process.</span></li>
+    </ul>
+    <ol class="steps">
+      <li><b>Build.</b> The compiler checks <a href="11-ownership-moves-clone-and-drop.html">ownership</a> and <a href="12-references-borrowing-and-lifetimes.html">borrowing</a> and decides layouts. No Rust rule is checked after this point.</li>
+      <li><b>Start.</b> The kernel creates the <a href="03-programs-processes-and-the-kernel.html">process</a> and its <a href="06-threads-and-their-stacks.html">main thread</a>, <a href="04-virtual-memory.html">maps the file</a>, and jumps to the entry point. Rust's <code>main</code> runs after the C library's and Rust's <a href="01-what-is-a-program.html">start-up code</a>.</li>
+      <li><b><code>vec![10, 20]</code>.</b> The <a href="09-rust-values-stack-heap-and-box.html">allocator</a> hands out an 8-byte block from the heap region; <code>scores</code>'s <a href="10-string-and-vec-memory.html">handle</a> records it.</li>
+      <li><b><code>push(30)</code>.</b> The buffer is full, so it <a href="10-string-and-vec-memory.html">grows</a>; in this run it grew in place.</li>
+      <li><b><code>total(&amp;scores)</code>.</b> A <a href="12-references-borrowing-and-lifetimes.html">shared borrow</a> is passed: an address. Whether there is a call and a <a href="08-function-calls-and-stack-frames.html">frame</a> depends on optimisation.</li>
+      <li><b><code>values.iter()</code>.</b> A small <a href="13-iterators-and-following-data.html">iterator</a> value with a cursor into the buffer.</li>
+      <li><b>First element.</b> The load is <a href="05-physical-ram-and-address-translation.html">translated by the MMU</a> and served by the <a href="07-registers-caches-and-a-memory-read.html">cache hierarchy</a>.</li>
+      <li><b>Next elements.</b> Same page, same cache line: the <a href="07-registers-caches-and-a-memory-read.html">fast path</a>.</li>
+      <li><b>Return.</b> The borrows end, <code>total</code>'s <a href="08-function-calls-and-stack-frames.html">frame</a> is abandoned, 60 is in <code>eax</code>.</li>
+      <li><b><code>println!</code>.</b> The text reaches the terminal through a <a href="03-programs-processes-and-the-kernel.html">system call</a> into the kernel.</li>
+      <li><b>End of <code>main</code>.</b> <code>scores</code> is <a href="11-ownership-moves-clone-and-drop.html">dropped</a> and its buffer freed to the allocator; then the process exits and the kernel releases its whole <a href="04-virtual-memory.html">address space</a>.</li>
+    </ol>
+  </div>
+  <aside class="leaves-out leaves-out--below">
+    <h4>What this picture leaves out</h4>
+    <ul>
+      <li>Timing. Steps are in order but not to scale: the start-up step alone runs far more instructions than the rest.</li>
+      <li>Other threads, interrupts and the <a href="03-programs-processes-and-the-kernel.html">scheduler</a>, which can pause this thread between any two instructions.</li>
+      <li>The trace mixes builds on purpose: where the unoptimised and optimised programs differ, the row says which one it describes. The next section shows the optimised program as it really is.</li>
+    </ul>
+  </aside>
+</figure>
 
-                    <h2 id="what-the-optimised-program-actually-does">
-                        What the optimised program actually does
-                    </h2>
-                    <p>
-                        The trace follows the source code. The binary built with
-                        <code>-O</code> is shorter. This is
-                        <code>main</code> from <code>examples/OUTPUT.txt</code>,
-                        with the formatting call left out
-                        <span class="tag tag-comp">Compiler</span>:
-                    </p>
-                    <div class="codeblock">
-                        <div class="codeblock__label">
-                            <span
-                                >x86-64, Intel syntax, symbol names
-                                shortened</span
-                            ><span>from <code>examples/OUTPUT.txt</code></span>
-                        </div>
-                        <pre><code>    mov   edi, 8
+<h2 id="what-the-optimised-program-actually-does">What the optimised program actually does</h2>
+<p>
+  The trace follows the source code. The binary built with <code>-O</code> is shorter. This is <code>main</code> from <code>examples/OUTPUT.txt</code>, with the formatting call left out <span class="tag tag-comp">Compiler</span>:
+</p>
+<div class="codeblock">
+  <div class="codeblock__label"><span>x86-64, Intel syntax, symbol names shortened</span><span>from <code>examples/OUTPUT.txt</code></span></div>
+<pre><code>    mov   edi, 8
     mov   esi, 4
     call  __rust_alloc                 <span class="c">; 8 bytes, aligned to 4: room for two i32</span>
     movabs rcx, 85899345930            <span class="c">; = 20·2³² + 10: both elements in one value</span>
@@ -504,281 +142,66 @@
     add   eax, 30                      <span class="c">; scores[2] is known to be 30</span>
     …                                  <span class="c">; println!("{t}")</span>
     call  __rust_dealloc               <span class="c">; drop(scores): free cap·4 = 16 bytes</span></code></pre>
-                    </div>
-                    <p>
-                        This short listing shows several layers at work, and the
-                        gap between the language and the machine:
-                    </p>
-                    <ul>
-                        <li>
-                            There is no <code>total</code> function in the
-                            binary at all, and no iterator: the loop became two
-                            loads and an addition. The compiler only has to
-                            preserve what the program prints, so it
-                            <a href="08-function-calls-and-stack-frames.html"
-                                >inlined</a
-                            >
-                            the call.
-                        </li>
-                        <li>
-                            The handle was laid out as <code>cap</code>,
-                            <code>ptr</code>, <code>len</code> in this build.
-                            That is allowed because the order is
-                            <a href="10-string-and-vec-memory.html"
-                                >unspecified</a
-                            >.
-                        </li>
-                        <li>
-                            The heap allocation is real:
-                            <code>__rust_alloc</code>, <code>grow_one</code> and
-                            <code>__rust_dealloc</code> are the
-                            <a href="09-rust-values-stack-heap-and-box.html"
-                                >global allocator</a
-                            >'s entry points, and the dealloc call is where the
-                            <a href="11-ownership-moves-clone-and-drop.html"
-                                >drop</a
-                            >
-                            happens.
-                        </li>
-                        <li>
-                            The borrow checker left no trace.
-                            <code>&amp;scores</code> became an address in a
-                            register, and the
-                            <a href="12-references-borrowing-and-lifetimes.html"
-                                >rules</a
-                            >
-                            that made it safe were checked before the program
-                            existed.
-                        </li>
-                    </ul>
+</div>
+<p>This short listing shows several layers at work, and the gap between the language and the machine:</p>
+<ul>
+  <li>There is no <code>total</code> function in the binary at all, and no iterator: the loop became two loads and an addition. The compiler only has to preserve what the program prints, so it <a href="08-function-calls-and-stack-frames.html">inlined</a> the call.</li>
+  <li>The handle was laid out as <code>cap</code>, <code>ptr</code>, <code>len</code> in this build. That is allowed because the order is <a href="10-string-and-vec-memory.html">unspecified</a>.</li>
+  <li>The heap allocation is real: <code>__rust_alloc</code>, <code>grow_one</code> and <code>__rust_dealloc</code> are the <a href="09-rust-values-stack-heap-and-box.html">global allocator</a>'s entry points, and the dealloc call is where the <a href="11-ownership-moves-clone-and-drop.html">drop</a> happens.</li>
+  <li>The borrow checker left no trace. <code>&amp;scores</code> became an address in a register, and the <a href="12-references-borrowing-and-lifetimes.html">rules</a> that made it safe were checked before the program existed.</li>
+</ul>
 
-                    <h2 id="which-layer-decides-what">
-                        Which layer decides what
-                    </h2>
-                    <div class="table-wrap">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th scope="col">Question</th>
-                                    <th scope="col">Decided by</th>
-                                    <th scope="col">When</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>
-                                        May <code>push</code> run while
-                                        <code>first</code> is alive?
-                                    </td>
-                                    <td>
-                                        <span class="tag tag-rust">Rust</span>
-                                        borrow checker
-                                    </td>
-                                    <td>compile time</td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        Is <code>sum</code> in a register or in
-                                        a stack slot?
-                                    </td>
-                                    <td>
-                                        <span class="tag tag-comp"
-                                            >Compiler</span
-                                        >
-                                    </td>
-                                    <td>compile time</td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        Where is the buffer, and does it move
-                                        when it grows?
-                                    </td>
-                                    <td>
-                                        <span class="tag tag-comp"
-                                            >Allocator</span
-                                        >
-                                    </td>
-                                    <td>run time</td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        Which physical frame holds the buffer's
-                                        page?
-                                    </td>
-                                    <td>
-                                        <span class="tag tag-os">OS</span>
-                                        kernel
-                                    </td>
-                                    <td>run time, on first touch</td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        Which thread runs, and on which core?
-                                    </td>
-                                    <td>
-                                        <span class="tag tag-os">OS</span>
-                                        scheduler
-                                    </td>
-                                    <td>run time</td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        Is the line in L1, and is the
-                                        translation in the TLB?
-                                    </td>
-                                    <td>
-                                        <span class="tag tag-hw">Hardware</span>
-                                    </td>
-                                    <td>run time, every access</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+<h2 id="which-layer-decides-what">Which layer decides what</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th scope="col">Question</th><th scope="col">Decided by</th><th scope="col">When</th></tr></thead>
+  <tbody>
+    <tr><td>May <code>push</code> run while <code>first</code> is alive?</td><td><span class="tag tag-rust">Rust</span> borrow checker</td><td>compile time</td></tr>
+    <tr><td>Is <code>sum</code> in a register or in a stack slot?</td><td><span class="tag tag-comp">Compiler</span></td><td>compile time</td></tr>
+    <tr><td>Where is the buffer, and does it move when it grows?</td><td><span class="tag tag-comp">Allocator</span></td><td>run time</td></tr>
+    <tr><td>Which physical frame holds the buffer's page?</td><td><span class="tag tag-os">OS</span> kernel</td><td>run time, on first touch</td></tr>
+    <tr><td>Which thread runs, and on which core?</td><td><span class="tag tag-os">OS</span> scheduler</td><td>run time</td></tr>
+    <tr><td>Is the line in L1, and is the translation in the TLB?</td><td><span class="tag tag-hw">Hardware</span></td><td>run time, every access</td></tr>
+  </tbody>
+</table>
+</div>
 
-                    <section class="keep" aria-labelledby="keep-h">
-                        <h2 id="keep-h">What to remember</h2>
-                        <ol>
-                            <li>
-                                Rust's ownership and borrowing rules act at
-                                compile time; at run time there are only
-                                addresses, loads and stores.
-                            </li>
-                            <li>
-                                The compiler, the allocator, the kernel and the
-                                hardware each make their own decisions about the
-                                same few bytes.
-                            </li>
-                            <li>
-                                The source describes behaviour; the binary may
-                                look very different and still behave the same.
-                            </li>
-                        </ol>
-                    </section>
+<section class="keep" aria-labelledby="keep-h">
+  <h2 id="keep-h">What to remember</h2>
+  <ol>
+    <li>Rust's ownership and borrowing rules act at compile time; at run time there are only addresses, loads and stores.</li>
+    <li>The compiler, the allocator, the kernel and the hardware each make their own decisions about the same few bytes.</li>
+    <li>The source describes behaviour; the binary may look very different and still behave the same.</li>
+  </ol>
+</section>
 
-                    <section class="test" aria-labelledby="test-h">
-                        <h2 id="test-h">Check your understanding</h2>
-                        <details>
-                            <summary>
-                                In the optimised binary, at which instruction is
-                                <code>scores</code> dropped?
-                            </summary>
-                            <div>
-                                <p>
-                                    The <code>call __rust_dealloc</code> near
-                                    the end of <code>main</code>: that frees the
-                                    buffer, which is all a
-                                    <code>Vec&lt;i32&gt;</code>'s drop has to
-                                    do.
-                                </p>
-                            </div>
-                        </details>
-                        <details>
-                            <summary>
-                                Which layer turns the virtual address of
-                                <code>scores[0]</code> into a physical one?
-                            </summary>
-                            <div>
-                                <p>
-                                    The MMU in the CPU, using page tables the
-                                    kernel set up. On a TLB hit, the kernel is
-                                    not involved at all.
-                                </p>
-                            </div>
-                        </details>
-                        <details>
-                            <summary>
-                                Does the borrow <code>&amp;scores</code> cost
-                                anything at run time?
-                            </summary>
-                            <div>
-                                <p>
-                                    Only what any address costs: at most one
-                                    register or a few bytes of stack. The
-                                    checking happened during compilation. Here
-                                    the compiler removed even that by inlining
-                                    <code>total</code>.
-                                </p>
-                            </div>
-                        </details>
-                    </section>
+<section class="test" aria-labelledby="test-h">
+  <h2 id="test-h">Check your understanding</h2>
+  <details>
+    <summary>In the optimised binary, at which instruction is <code>scores</code> dropped?</summary>
+    <div><p>The <code>call __rust_dealloc</code> near the end of <code>main</code>: that frees the buffer, which is all a <code>Vec&lt;i32&gt;</code>'s drop has to do.</p></div>
+  </details>
+  <details>
+    <summary>Which layer turns the virtual address of <code>scores[0]</code> into a physical one?</summary>
+    <div><p>The MMU in the CPU, using page tables the kernel set up. On a TLB hit, the kernel is not involved at all.</p></div>
+  </details>
+  <details>
+    <summary>Does the borrow <code>&amp;scores</code> cost anything at run time?</summary>
+    <div><p>Only what any address costs: at most one register or a few bytes of stack. The checking happened during compilation. Here the compiler removed even that by inlining <code>total</code>.</p></div>
+  </details>
+</section>
 
-                    <p class="related">
-                        <b>Related:</b>
-                        <a href="../index.html">the whole map</a> ·
-                        <a href="01-what-is-a-program.html"
-                            >what a program file is</a
-                        >
-                        ·
-                        <a href="07-registers-caches-and-a-memory-read.html"
-                            >one load in detail</a
-                        >
-                        ·
-                        <a href="08-function-calls-and-stack-frames.html"
-                            >frames</a
-                        >
-                        · <a href="10-string-and-vec-memory.html">the Vec</a> ·
-                        <a href="12-references-borrowing-and-lifetimes.html"
-                            >borrows</a
-                        >
-                    </p>
+<p class="related"><b>Related:</b> <a href="../index.html">the whole map</a> · <a href="01-what-is-a-program.html">what a program file is</a> · <a href="07-registers-caches-and-a-memory-read.html">one load in detail</a> · <a href="08-function-calls-and-stack-frames.html">frames</a> · <a href="10-string-and-vec-memory.html">the Vec</a> · <a href="12-references-borrowing-and-lifetimes.html">borrows</a></p>
 
-                    <p>
-                        <b>Where to go from here:</b> each layer has a deeper
-                        reference. The
-                        <a href="../reference/sources.html">list of sources</a>
-                        names the Book, the Reference, the Rustonomicon, the
-                        Linux manual pages, OSTEP and Drepper's paper, with the
-                        exact section behind each claim.
-                    </p>
-                    <nav class="pager" aria-label="Previous and next">
-                        <a
-                            class="pager__prev"
-                            href="14-memory-bugs-and-rust-safety.html"
-                            rel="prev"
-                            ><span class="pager__dir">← Previous</span
-                            ><span class="pager__q"
-                                >How do memory bugs happen, and what does Rust
-                                change?</span
-                            ></a
-                        >
-                        <a class="pager__next" href="../index.html" rel="next"
-                            ><span class="pager__dir">Back to →</span
-                            ><span class="pager__q">The whole map</span></a
-                        >
-                    </nav>
-                </article>
-                <footer class="foot">
-                    <p>
-                        Observed values, such as addresses, sizes, assembly and
-                        program output, come from one machine. It runs Linux 7.0
-                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
-                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
-                        limit. Addresses change on every run, and other systems,
-                        toolchains and allocators can differ. Details:
-                        <a href="../reference/sources.html">Sources</a> ·
-                        <code>examples/OUTPUT.txt</code>.
-                    </p>
-                </footer>
-            </main>
-            <nav class="otp" aria-label="On this page">
-                <p class="otp__h">On this page</p>
-                <ol class="otp__list">
-                    <li class="lv2">
-                        <a href="#what-the-optimised-program-actually-does"
-                            >What the optimised program actually does</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a href="#which-layer-decides-what"
-                            >Which layer decides what</a
-                        >
-                    </li>
-                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
-                    <li class="lv2">
-                        <a href="#test-h">Check your understanding</a>
-                    </li>
-                </ol>
-            </nav>
-        </div>
-    </body>
+<p><b>Where to go from here:</b> each layer has a deeper reference. The <a href="../reference/sources.html">list of sources</a> names the Book, the Reference, the Rustonomicon, the Linux manual pages, OSTEP and Drepper's paper, with the exact section behind each claim.</p>
+<nav class="pager" aria-label="Previous and next">
+<a class="pager__prev" href="14-memory-bugs-and-rust-safety.html" rel="prev"><span class="pager__dir">← Previous</span><span class="pager__q">How do memory bugs happen, and what does Rust change?</span></a>
+<a class="pager__next" href="../index.html" rel="next"><span class="pager__dir">Back to →</span><span class="pager__q">The whole map</span></a>
+</nav>
+</article>
+<footer class="foot"><p>Observed values, such as addresses, sizes, assembly and program output, come from one machine. It runs Linux 7.0 (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack limit. Addresses change on every run, and other systems, toolchains and allocators can differ. Details: <a href="../reference/sources.html">Sources</a> · <code>examples/OUTPUT.txt</code>.</p></footer>
+</main>
+<nav class="otp" aria-label="On this page"><p class="otp__h">On this page</p><ol class="otp__list"><li class="lv2"><a href="#what-the-optimised-program-actually-does">What the optimised program actually does</a></li><li class="lv2"><a href="#which-layer-decides-what">Which layer decides what</a></li><li class="lv2"><a href="#keep-h">What to remember</a></li><li class="lv2"><a href="#test-h">Check your understanding</a></li></ol></nav>
+</div>
+</body>
 </html>

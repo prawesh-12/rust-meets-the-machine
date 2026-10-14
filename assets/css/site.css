@@ -880,6 +880,16 @@ figure.fig {
         break-inside: avoid;
     }
 }
+/* a figure that needs the full width keeps its notes underneath at every size */
+@media (min-width: 1360px) {
+    .fig__grid:not(.fig__grid--note) > .leaves-out ul {
+        columns: 2;
+        column-gap: 2rem;
+    }
+    .fig__grid:not(.fig__grid--note) > .leaves-out li {
+        break-inside: avoid;
+    }
+}
 .leaves-out li {
     margin: 0 0 0.5rem;
 }
@@ -1520,7 +1530,7 @@ svg.wires path.own {
 }
 @media (min-width: 900px) {
     .build {
-        grid-template-columns: 1.05fr 1fr 1.05fr;
+        grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1.05fr);
     }
 }
 .build__stage {

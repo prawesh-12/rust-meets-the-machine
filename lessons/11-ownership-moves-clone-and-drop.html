@@ -1,649 +1,177 @@
 <!doctype html>
 <html lang="en" class="no-js">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>
-            Who frees a String&#x27;s memory, and what does let b = a; change? —
-            How a Rust program meets the machine
-        </title>
-        <meta
-            name="description"
-            content="Who is responsible for freeing a String&#x27;s buffer: what a move, a copy and a clone do to the bytes, when values are dropped and in what order, and what freeing actually gives back."
-        />
-        <link rel="stylesheet" href="../assets/css/site.css" />
-        <script src="../assets/js/site.js"></script>
-        <script src="../assets/js/diagrams.js" defer></script>
-    </head>
-    <body>
-        <a class="skip" href="#main">Skip to the text</a>
-        <header class="top">
-            <a class="top__title" href="../index.html"
-                >How a Rust program meets the machine</a
-            >
-            <span class="top__here">11 · Ownership, moves, drop</span>
-            <span class="top__spacer"></span>
-            <button
-                class="top__btn"
-                type="button"
-                data-toc-toggle
-                aria-expanded="false"
-                aria-controls="toc"
-            >
-                Contents
-            </button>
-        </header>
-        <div class="shell">
-            <nav class="toc" id="toc" aria-label="Contents">
-                <a class="toc__home" href="../index.html">The whole map</a>
-                <p class="toc__group">Before your code runs</p>
-                <ol>
-                    <li>
-                        <a href="01-what-is-a-program.html"
-                            ><span class="n">01</span
-                            ><span>What a program is</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="02-how-a-cpu-runs-code.html"
-                            ><span class="n">02</span
-                            ><span>How a CPU runs code</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="03-programs-processes-and-the-kernel.html"
-                            ><span class="n">03</span
-                            ><span>Processes and the kernel</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Addresses</p>
-                <ol>
-                    <li>
-                        <a href="04-virtual-memory.html"
-                            ><span class="n">04</span
-                            ><span>Inside an address space</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="05-physical-ram-and-address-translation.html"
-                            ><span class="n">05</span
-                            ><span>From virtual address to RAM</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="06-threads-and-their-stacks.html"
-                            ><span class="n">06</span
-                            ><span>Threads and their stacks</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="07-registers-caches-and-a-memory-read.html"
-                            ><span class="n">07</span
-                            ><span>Caches and one load</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Calls and data</p>
-                <ol>
-                    <li>
-                        <a href="08-function-calls-and-stack-frames.html"
-                            ><span class="n">08</span
-                            ><span>Calls and stack frames</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="09-rust-values-stack-heap-and-box.html"
-                            ><span class="n">09</span
-                            ><span>Values, stack, heap, Box</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="10-string-and-vec-memory.html"
-                            ><span class="n">10</span
-                            ><span>String and Vec</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Rust's rules</p>
-                <ol>
-                    <li>
-                        <a
-                            href="11-ownership-moves-clone-and-drop.html"
-                            aria-current="page"
-                            ><span class="n">11</span
-                            ><span>Ownership, moves, drop</span></a
-                        >
-                        <ol class="toc__sub">
-                            <li class="lv2">
-                                <a href="#one-owner-per-value"
-                                    >One owner per value</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#move-copy-and-clone"
-                                    >Move, copy and clone</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a
-                                    href="#when-values-are-dropped-and-in-what-order"
-                                    >When values are dropped, and in what
-                                    order</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a
-                                    href="#freeing-is-not-returning-memory-to-the-operating-system"
-                                    >Freeing is not returning memory to the
-                                    operating system</a
-                                >
-                            </li>
-                            <li class="lv2">
-                                <a href="#keep-h">What to remember</a>
-                            </li>
-                            <li class="lv2">
-                                <a href="#test-h">Check your understanding</a>
-                            </li>
-                        </ol>
-                    </li>
-                    <li>
-                        <a href="12-references-borrowing-and-lifetimes.html"
-                            ><span class="n">12</span
-                            ><span>References and lifetimes</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="13-iterators-and-following-data.html"
-                            ><span class="n">13</span><span>Iterators</span></a
-                        >
-                    </li>
-                    <li>
-                        <a href="14-memory-bugs-and-rust-safety.html"
-                            ><span class="n">14</span
-                            ><span>Memory bugs and safety</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">All together</p>
-                <ol>
-                    <li>
-                        <a href="15-follow-one-example-end-to-end.html"
-                            ><span class="n">15</span
-                            ><span>One call, every layer</span></a
-                        >
-                    </li>
-                </ol>
-                <p class="toc__group">Reference</p>
-                <ul class="toc__ref">
-                    <li><a href="../reference/glossary.html">Glossary</a></li>
-                    <li><a href="../reference/sources.html">Sources</a></li>
-                    <li>
-                        <a href="../reference/concept-map.html">Concept map</a>
-                    </li>
-                </ul>
-            </nav>
-            <main id="main">
-                <article class="page">
-                    <header class="opening">
-                        <div class="opening__meta">
-                            <span class="opening__num">11</span
-                            ><span class="tag tag-rust">Rust</span>
-                        </div>
-                        <h1>
-                            Who frees a String's memory, and what does
-                            <code>let b = a;</code> change?
-                        </h1>
-                        <p class="why">
-                            A <code>String</code> is a 24-byte
-                            <a href="10-string-and-vec-memory.html"
-                                >handle that points to a heap buffer</a
-                            >. Copying the handle would give two handles to one
-                            buffer, and then both would try to free it.
-                            Ownership is the rule set that prevents this, and it
-                            is checked entirely by the compiler.
-                        </p>
-                    </header>
-                    <ul
-                        class="legend"
-                        aria-label="Which layer each colour means"
-                    >
-                        <li><span class="sw sw-rust"></span>Rust language</li>
-                        <li>
-                            <span class="sw sw-comp"></span>Compiler &amp;
-                            runtime library
-                        </li>
-                        <li><span class="sw sw-os"></span>Operating system</li>
-                        <li>
-                            <span class="sw sw-hw"></span>CPU &amp; hardware
-                        </li>
-                    </ul>
-                    <h2 id="one-owner-per-value">One owner per value</h2>
-                    <p>
-                        The Book states the rules in three lines
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html#ownership-rules"
-                            >The Book §4.1</a
-                        >:
-                    </p>
-                    <ul>
-                        <li>Each value in Rust has an owner.</li>
-                        <li>There can only be one owner at a time.</li>
-                        <li>
-                            When the owner goes out of scope, the value will be
-                            dropped.
-                        </li>
-                    </ul>
-                    <p>
-                        "Dropped" means its destructor runs. For a
-                        <code>String</code>, that gives the buffer back to the
-                        allocator. Because there is exactly one owner, the
-                        buffer is freed exactly once: never zero times (a leak)
-                        and never twice (a
-                        <a
-                            href="https://en.wikipedia.org/wiki/C_dynamic_memory_allocation#Common_errors"
-                            class="ext"
-                            >double free</a
-                        >).
-                    </p>
-                    <p>
-                        None of this exists at run time
-                        <span class="tag tag-rust">Rust</span>. There is no
-                        owner field in memory and no counter. The compiler works
-                        out, from the source, which binding owns what and where
-                        each drop has to happen, and inserts the calls to the
-                        destructors <span class="tag tag-comp">Compiler</span>.
-                    </p>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Who frees a String&#x27;s memory, and what does let b = a; change? — How a Rust program meets the machine</title>
+<meta name="description" content="Who is responsible for freeing a String&#x27;s buffer: what a move, a copy and a clone do to the bytes, when values are dropped and in what order, and what freeing actually gives back.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/diagrams.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the text</a>
+<header class="top">
+  <a class="top__title" href="../index.html">How a Rust program meets the machine</a>
+  <span class="top__here">11 · Ownership, moves, drop</span>
+  <span class="top__spacer"></span>
+  <button class="top__btn" type="button" data-toc-toggle aria-expanded="false" aria-controls="toc">Contents</button>
+</header>
+<div class="shell">
+<nav class="toc" id="toc" aria-label="Contents">
+<a class="toc__home" href="../index.html">The whole map</a>
+<p class="toc__group">Before your code runs</p><ol>
+<li><a href="01-what-is-a-program.html"><span class="n">01</span><span>What a program is</span></a></li>
+<li><a href="02-how-a-cpu-runs-code.html"><span class="n">02</span><span>How a CPU runs code</span></a></li>
+<li><a href="03-programs-processes-and-the-kernel.html"><span class="n">03</span><span>Processes and the kernel</span></a></li>
+</ol>
+<p class="toc__group">Addresses</p><ol>
+<li><a href="04-virtual-memory.html"><span class="n">04</span><span>Inside an address space</span></a></li>
+<li><a href="05-physical-ram-and-address-translation.html"><span class="n">05</span><span>From virtual address to RAM</span></a></li>
+<li><a href="06-threads-and-their-stacks.html"><span class="n">06</span><span>Threads and their stacks</span></a></li>
+<li><a href="07-registers-caches-and-a-memory-read.html"><span class="n">07</span><span>Caches and one load</span></a></li>
+</ol>
+<p class="toc__group">Calls and data</p><ol>
+<li><a href="08-function-calls-and-stack-frames.html"><span class="n">08</span><span>Calls and stack frames</span></a></li>
+<li><a href="09-rust-values-stack-heap-and-box.html"><span class="n">09</span><span>Values, stack, heap, Box</span></a></li>
+<li><a href="10-string-and-vec-memory.html"><span class="n">10</span><span>String and Vec</span></a></li>
+</ol>
+<p class="toc__group">Rust's rules</p><ol>
+<li><a href="11-ownership-moves-clone-and-drop.html" aria-current="page"><span class="n">11</span><span>Ownership, moves, drop</span></a><ol class="toc__sub"><li class="lv2"><a href="#one-owner-per-value">One owner per value</a></li><li class="lv2"><a href="#move-copy-and-clone">Move, copy and clone</a></li><li class="lv2"><a href="#when-values-are-dropped-and-in-what-order">When values are dropped, and in what order</a></li><li class="lv2"><a href="#freeing-is-not-returning-memory-to-the-operating-system">Freeing is not returning memory to the operating system</a></li><li class="lv2"><a href="#keep-h">What to remember</a></li><li class="lv2"><a href="#test-h">Check your understanding</a></li></ol></li>
+<li><a href="12-references-borrowing-and-lifetimes.html"><span class="n">12</span><span>References and lifetimes</span></a></li>
+<li><a href="13-iterators-and-following-data.html"><span class="n">13</span><span>Iterators</span></a></li>
+<li><a href="14-memory-bugs-and-rust-safety.html"><span class="n">14</span><span>Memory bugs and safety</span></a></li>
+</ol>
+<p class="toc__group">All together</p><ol>
+<li><a href="15-follow-one-example-end-to-end.html"><span class="n">15</span><span>One call, every layer</span></a></li>
+</ol>
+<p class="toc__group">Reference</p><ul class="toc__ref">
+<li><a href="../reference/glossary.html">Glossary</a></li>
+<li><a href="../reference/sources.html">Sources</a></li>
+<li><a href="../reference/concept-map.html">Concept map</a></li>
+</ul>
+</nav>
+<main id="main">
+<article class="page">
+<header class="opening">
+  <div class="opening__meta"><span class="opening__num">11</span><span class="tag tag-rust">Rust</span></div>
+  <h1>Who frees a String's memory, and what does <code>let b = a;</code> change?</h1>
+  <p class="why">A <code>String</code> is a 24-byte <a href="10-string-and-vec-memory.html">handle that points to a heap buffer</a>. Copying the handle would give two handles to one buffer, and then both would try to free it. Ownership is the rule set that prevents this, and it is checked entirely by the compiler.</p>
+</header>
+<ul class="legend" aria-label="Which layer each colour means"><li><span class="sw sw-rust"></span>Rust language</li><li><span class="sw sw-comp"></span>Compiler &amp; runtime library</li><li><span class="sw sw-os"></span>Operating system</li><li><span class="sw sw-hw"></span>CPU &amp; hardware</li></ul>
+<h2 id="one-owner-per-value">One owner per value</h2>
+<p>The Book states the rules in three lines <a class="src" href="https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html#ownership-rules">The Book §4.1</a>:</p>
+<ul>
+  <li>Each value in Rust has an owner.</li>
+  <li>There can only be one owner at a time.</li>
+  <li>When the owner goes out of scope, the value will be dropped.</li>
+</ul>
+<p>
+  "Dropped" means its destructor runs. For a <code>String</code>, that gives the buffer back to the allocator. Because there is exactly one owner, the buffer is freed exactly once: never zero times (a leak) and never twice (a <a href="https://en.wikipedia.org/wiki/C_dynamic_memory_allocation#Common_errors" class="ext">double free</a>).
+</p>
+<p>
+  None of this exists at run time <span class="tag tag-rust">Rust</span>. There is no owner field in memory and no counter. The compiler works out, from the source, which binding owns what and where each drop has to happen, and inserts the calls to the destructors <span class="tag tag-comp">Compiler</span>.
+</p>
 
-                    <div class="codeblock">
-                        <div class="codeblock__label">
-                            <span
-                                ><code>examples/moves.rs</code> (the part the
-                                figure follows)</span
-                            >
-                        </div>
-                        <pre><code><span class="k">let</span> n = 5;
+<div class="codeblock">
+  <div class="codeblock__label"><span><code>examples/moves.rs</code> (the part the figure follows)</span></div>
+<pre><code><span class="k">let</span> n = 5;
 <span class="k">let</span> m = n;                  <span class="c">// copy</span>
 <span class="k">let</span> a = String::from(<span class="k">"hi"</span>);
 <span class="k">let</span> b = a;                  <span class="c">// move</span>
 <span class="k">let</span> c = b.clone();          <span class="c">// clone</span></code></pre>
-                    </div>
+</div>
 
-                    <figure
-                        class="fig"
-                        data-fig="steps-wires"
-                        data-label="ownership diagram"
-                    >
-                        <div class="fig__head">
-                            <p class="fig__title">
-                                Copy, move, clone, then the end of the scope
-                            </p>
-                            <span class="fig__kind"
-                                >Addresses from one run of moves.rs ·
-                                shortened</span
-                            >
-                        </div>
-                        <div class="fig__grid fig__grid--note">
-                            <div class="fig__body">
-                                <div class="callstack callstack--2">
-                                    <pre
-                                        class="src-lines"
-                                    ><code><span class="ln" data-now="0"><span class="k">let</span> n = 5;</span><span class="ln" data-now="1"><span class="k">let</span> m = n;</span><span class="ln" data-now="2"><span class="k">let</span> a = String::from(<span class="k">"hi"</span>);</span><span class="ln" data-now="3"><span class="k">let</span> b = a;</span><span class="ln" data-now="4"><span class="k">let</span> c = b.clone();</span><span class="ln" data-now="5 6">}  <span class="c">// end of scope</span></span></code></pre>
+<figure class="fig" data-fig="steps-wires" data-label="ownership diagram">
+  <div class="fig__head">
+    <p class="fig__title">Copy, move, clone, then the end of the scope</p>
+    <span class="fig__kind">Addresses from one run of moves.rs · shortened</span>
+  </div>
+  <div class="fig__grid fig__grid--note">
+    <div class="fig__body">
+      <div class="callstack callstack--2">
+<pre class="src-lines"><code><span class="ln" data-now="0"><span class="k">let</span> n = 5;</span><span class="ln" data-now="1"><span class="k">let</span> m = n;</span><span class="ln" data-now="2"><span class="k">let</span> a = String::from(<span class="k">"hi"</span>);</span><span class="ln" data-now="3"><span class="k">let</span> b = a;</span><span class="ln" data-now="4"><span class="k">let</span> c = b.clone();</span><span class="ln" data-now="5 6">}  <span class="c">// end of scope</span></span></code></pre>
 
-                                    <div class="own">
-                                        <div class="own__vars">
-                                            <div class="var" data-from="0">
-                                                <span class="var__name"
-                                                    ><span class="nm">n</span>
-                                                    <span
-                                                        class="var__state copy"
-                                                        >i32</span
-                                                    ></span
-                                                >
-                                                <div class="cells">
-                                                    <div class="cell">5</div>
-                                                </div>
-                                            </div>
-                                            <div class="var" data-from="1">
-                                                <span class="var__name"
-                                                    ><span class="nm">m</span>
-                                                    <span
-                                                        class="var__state copy"
-                                                        data-vals='["","copy of n"]'
-                                                        >copy of n</span
-                                                    ></span
-                                                >
-                                                <div class="cells">
-                                                    <div
-                                                        class="cell"
-                                                        data-now="1"
-                                                    >
-                                                        5
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="var"
-                                                data-from="2"
-                                                data-cls='{"3":"is-moved"}'
-                                            >
-                                                <span class="var__name"
-                                                    ><span class="nm">a</span>
-                                                    <span
-                                                        class="var__state"
-                                                        data-cls='{"2":"owner","3":"moved"}'
-                                                        data-vals='["","","owner","moved out","moved out","moved out: not dropped"]'
-                                                        >moved out: not
-                                                        dropped</span
-                                                    ></span
-                                                >
-                                                <div
-                                                    class="handle"
-                                                    id="own-a"
-                                                    data-wire-to="own-buf1"
-                                                    data-wire-cls="own"
-                                                    data-wire-steps="2"
-                                                >
-                                                    <div>
-                                                        <small>ptr</small
-                                                        ><b>…dd50</b>
-                                                    </div>
-                                                    <div>
-                                                        <small>len</small
-                                                        ><b>2</b>
-                                                    </div>
-                                                    <div>
-                                                        <small>cap</small
-                                                        ><b>2</b>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="var"
-                                                data-from="3"
-                                                data-cls='{"6":"is-moved"}'
-                                            >
-                                                <span class="var__name"
-                                                    ><span class="nm">b</span>
-                                                    <span
-                                                        class="var__state owner"
-                                                        data-vals='["","","","owner","owner","owner","dropped"]'
-                                                        >dropped</span
-                                                    ></span
-                                                >
-                                                <div
-                                                    class="handle"
-                                                    id="own-b"
-                                                    data-now="3"
-                                                    data-wire-to="own-buf1"
-                                                    data-wire-cls="own"
-                                                    data-wire-steps="3 4 5"
-                                                >
-                                                    <div>
-                                                        <small>ptr</small
-                                                        ><b>…dd50</b>
-                                                    </div>
-                                                    <div>
-                                                        <small>len</small
-                                                        ><b>2</b>
-                                                    </div>
-                                                    <div>
-                                                        <small>cap</small
-                                                        ><b>2</b>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="var"
-                                                data-from="4"
-                                                data-cls='{"5":"is-moved"}'
-                                            >
-                                                <span class="var__name"
-                                                    ><span class="nm">c</span>
-                                                    <span
-                                                        class="var__state owner"
-                                                        data-vals='["","","","","owner","dropped"]'
-                                                        >dropped</span
-                                                    ></span
-                                                >
-                                                <div
-                                                    class="handle"
-                                                    id="own-c"
-                                                    data-now="4"
-                                                    data-wire-to="own-buf2"
-                                                    data-wire-cls="own"
-                                                    data-wire-steps="4"
-                                                >
-                                                    <div>
-                                                        <small>ptr</small
-                                                        ><b>…dd70</b>
-                                                    </div>
-                                                    <div>
-                                                        <small>len</small
-                                                        ><b>2</b>
-                                                    </div>
-                                                    <div>
-                                                        <small>cap</small
-                                                        ><b>2</b>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="heap-zone">
-                                            <div class="heap-zone__h">Heap</div>
-                                            <div class="bufs">
-                                                <div
-                                                    class="buf"
-                                                    id="own-buf1"
-                                                    data-from="2"
-                                                    data-cls='{"6":"is-freed"}'
-                                                >
-                                                    <span class="buf__addr"
-                                                        >…dd50</span
-                                                    >
-                                                    <div class="cells">
-                                                        <div class="cell">
-                                                            h
-                                                        </div>
-                                                        <div class="cell">
-                                                            i
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div
-                                                    class="buf"
-                                                    id="own-buf2"
-                                                    data-from="4"
-                                                    data-cls='{"5":"is-freed"}'
-                                                >
-                                                    <span class="buf__addr"
-                                                        >…dd70</span
-                                                    >
-                                                    <div class="cells">
-                                                        <div
-                                                            class="cell"
-                                                            data-now="4"
-                                                        >
-                                                            h
-                                                        </div>
-                                                        <div
-                                                            class="cell"
-                                                            data-now="4"
-                                                        >
-                                                            i
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div
-                                    class="controls"
-                                    data-stepper-controls
-                                ></div>
-                                <p class="now-says" aria-live="polite"></p>
-                                <ol class="steps">
-                                    <li>
-                                        <code>n</code> holds the integer 5.
-                                        Nothing on the heap.
-                                    </li>
-                                    <li>
-                                        <code>let m = n;</code> copies the 4
-                                        bytes. <code>i32</code> is
-                                        <code>Copy</code>, so
-                                        <code>n</code> stays usable; there is
-                                        nothing to free, so two copies cause no
-                                        problem.
-                                    </li>
-                                    <li>
-                                        <code>String::from("hi")</code>
-                                        allocates a 2-byte buffer.
-                                        <code>a</code> is its owner.
-                                    </li>
-                                    <li>
-                                        <code>let b = a;</code> copies the
-                                        24-byte handle into <code>b</code>. The
-                                        buffer is not copied: both handles hold
-                                        <code>…dd50</code>. Ownership moved to
-                                        <code>b</code>, and the compiler will
-                                        now reject any use of <code>a</code>.
-                                    </li>
-                                    <li>
-                                        <code>b.clone()</code> asks for a new
-                                        buffer and copies the bytes into it.
-                                        <code>c</code> owns that second buffer,
-                                        at <code>…dd70</code>.
-                                    </li>
-                                    <li>
-                                        End of scope. Bindings are dropped in
-                                        reverse order of declaration, so
-                                        <code>c</code> goes first: its buffer is
-                                        freed.
-                                    </li>
-                                    <li>
-                                        Then <code>b</code>: the first buffer is
-                                        freed. <code>a</code> was moved out of,
-                                        so nothing happens for it, and the
-                                        buffer is freed once. <code>m</code> and
-                                        <code>n</code> have nothing to free.
-                                    </li>
-                                </ol>
-                            </div>
-                            <aside class="leaves-out">
-                                <h4>What this picture leaves out</h4>
-                                <ul>
-                                    <li>
-                                        Where the handles are stored. Moves in
-                                        optimised code are often nothing at all:
-                                        the compiler reuses the same storage, or
-                                        keeps the handle in registers.
-                                    </li>
-                                    <li>
-                                        The order of <code>ptr</code>,
-                                        <code>len</code> and <code>cap</code>,
-                                        which is not specified.
-                                    </li>
-                                    <li>
-                                        That <code>a</code>'s old bytes may
-                                        still sit in memory after the move. The
-                                        compiler stops you from reading them; it
-                                        does not erase them.
-                                    </li>
-                                    <li>
-                                        What the allocator does with a freed
-                                        block (below).
-                                    </li>
-                                </ul>
-                            </aside>
-                        </div>
-                    </figure>
+        <div class="own">
+          <div class="own__vars">
+            <div class="var" data-from="0">
+              <span class="var__name"><span class="nm">n</span> <span class="var__state copy">i32</span></span>
+              <div class="cells"><div class="cell">5</div></div>
+            </div>
+            <div class="var" data-from="1">
+              <span class="var__name"><span class="nm">m</span> <span class="var__state copy" data-vals='["","copy of n"]'>copy of n</span></span>
+              <div class="cells"><div class="cell" data-now="1">5</div></div>
+            </div>
+            <div class="var" data-from="2" data-cls='{"3":"is-moved"}'>
+              <span class="var__name"><span class="nm">a</span> <span class="var__state" data-cls='{"2":"owner","3":"moved"}' data-vals='["","","owner","moved out","moved out","moved out: not dropped"]'>moved out: not dropped</span></span>
+              <div class="handle" id="own-a" data-wire-to="own-buf1" data-wire-cls="own" data-wire-steps="2"><div><small>ptr</small><b>…dd50</b></div><div><small>len</small><b>2</b></div><div><small>cap</small><b>2</b></div></div>
+            </div>
+            <div class="var" data-from="3" data-cls='{"6":"is-moved"}'>
+              <span class="var__name"><span class="nm">b</span> <span class="var__state owner" data-vals='["","","","owner","owner","owner","dropped"]'>dropped</span></span>
+              <div class="handle" id="own-b" data-now="3" data-wire-to="own-buf1" data-wire-cls="own" data-wire-steps="3 4 5"><div><small>ptr</small><b>…dd50</b></div><div><small>len</small><b>2</b></div><div><small>cap</small><b>2</b></div></div>
+            </div>
+            <div class="var" data-from="4" data-cls='{"5":"is-moved"}'>
+              <span class="var__name"><span class="nm">c</span> <span class="var__state owner" data-vals='["","","","","owner","dropped"]'>dropped</span></span>
+              <div class="handle" id="own-c" data-now="4" data-wire-to="own-buf2" data-wire-cls="own" data-wire-steps="4"><div><small>ptr</small><b>…dd70</b></div><div><small>len</small><b>2</b></div><div><small>cap</small><b>2</b></div></div>
+            </div>
+          </div>
+          <div class="heap-zone">
+            <div class="heap-zone__h">Heap</div>
+            <div class="bufs">
+              <div class="buf" id="own-buf1" data-from="2" data-cls='{"6":"is-freed"}'>
+                <span class="buf__addr">…dd50</span>
+                <div class="cells"><div class="cell">h</div><div class="cell">i</div></div>
+              </div>
+              <div class="buf" id="own-buf2" data-from="4" data-cls='{"5":"is-freed"}'>
+                <span class="buf__addr">…dd70</span>
+                <div class="cells"><div class="cell" data-now="4">h</div><div class="cell" data-now="4">i</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="controls" data-stepper-controls></div>
+      <p class="now-says" aria-live="polite"></p>
+      <ol class="steps">
+        <li><code>n</code> holds the integer 5. Nothing on the heap.</li>
+        <li><code>let m = n;</code> copies the 4 bytes. <code>i32</code> is <code>Copy</code>, so <code>n</code> stays usable; there is nothing to free, so two copies cause no problem.</li>
+        <li><code>String::from("hi")</code> allocates a 2-byte buffer. <code>a</code> is its owner.</li>
+        <li><code>let b = a;</code> copies the 24-byte handle into <code>b</code>. The buffer is not copied: both handles hold <code>…dd50</code>. Ownership moved to <code>b</code>, and the compiler will now reject any use of <code>a</code>.</li>
+        <li><code>b.clone()</code> asks for a new buffer and copies the bytes into it. <code>c</code> owns that second buffer, at <code>…dd70</code>.</li>
+        <li>End of scope. Bindings are dropped in reverse order of declaration, so <code>c</code> goes first: its buffer is freed.</li>
+        <li>Then <code>b</code>: the first buffer is freed. <code>a</code> was moved out of, so nothing happens for it, and the buffer is freed once. <code>m</code> and <code>n</code> have nothing to free.</li>
+      </ol>
+    </div>
+    <aside class="leaves-out">
+      <h4>What this picture leaves out</h4>
+      <ul>
+        <li>Where the handles are stored. Moves in optimised code are often nothing at all: the compiler reuses the same storage, or keeps the handle in registers.</li>
+        <li>The order of <code>ptr</code>, <code>len</code> and <code>cap</code>, which is not specified.</li>
+        <li>That <code>a</code>'s old bytes may still sit in memory after the move. The compiler stops you from reading them; it does not erase them.</li>
+        <li>What the allocator does with a freed block (below).</li>
+      </ul>
+    </aside>
+  </div>
+</figure>
 
-                    <h2 id="move-copy-and-clone">Move, copy and clone</h2>
-                    <div class="table-wrap">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th scope="col"></th>
-                                    <th scope="col">
-                                        What happens to the bytes
-                                    </th>
-                                    <th scope="col">
-                                        Is the old binding usable?
-                                    </th>
-                                    <th scope="col">Heap work</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <th scope="row">
-                                        Move <code>let b = a;</code>
-                                    </th>
-                                    <td>
-                                        The value's own bytes (for
-                                        <code>String</code>, the 24-byte handle)
-                                        may be copied, or the compiler may reuse
-                                        the storage
-                                    </td>
-                                    <td>No: compile error E0382</td>
-                                    <td>None</td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">
-                                        Copy <code>let m = n;</code>
-                                    </th>
-                                    <td>The same: the bytes may be copied</td>
-                                    <td>Yes</td>
-                                    <td>
-                                        None; only types with nothing to free
-                                        can be <code>Copy</code>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">
-                                        Clone <code>b.clone()</code>
-                                    </th>
-                                    <td>
-                                        Whatever the type's
-                                        <code>clone</code> does; for
-                                        <code>String</code>, a new buffer and a
-                                        copy of the text
-                                    </td>
-                                    <td>Yes</td>
-                                    <td>
-                                        For <code>String</code>, one allocation
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <p>
-                        The documentation of <code>Copy</code> describes the
-                        first two rows: "the only difference is whether you are
-                        allowed to access x after the assignment. Under the
-                        hood, both a copy and a move can result in bits being
-                        copied in memory, although this is sometimes optimized
-                        away"
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/std/marker/trait.Copy.html#whats-the-difference-between-copy-and-clone"
-                            >std::marker::Copy</a
-                        >. A move is not a different machine operation from a
-                        copy. The difference is a rule about the source binding.
-                        A type that owns a resource, like <code>String</code>,
-                        cannot be <code>Copy</code>, because two usable copies
-                        of the handle would both free the buffer.
-                    </p>
-                    <p>Using <code>a</code> after the move gives:</p>
-                    <div class="codeblock codeblock--bad">
-                        <div class="codeblock__label">
-                            <span><code>examples/move.rs</code></span
-                            ><span class="verdict">does not compile</span>
-                        </div>
-                        <pre
-                            class="out"
-                        ><code>error[E0382]: borrow of moved value: `a`
+<h2 id="move-copy-and-clone">Move, copy and clone</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th scope="col"></th><th scope="col">What happens to the bytes</th><th scope="col">Is the old binding usable?</th><th scope="col">Heap work</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Move <code>let b = a;</code></th><td>The value's own bytes (for <code>String</code>, the 24-byte handle) may be copied, or the compiler may reuse the storage</td><td>No: compile error E0382</td><td>None</td></tr>
+    <tr><th scope="row">Copy <code>let m = n;</code></th><td>The same: the bytes may be copied</td><td>Yes</td><td>None; only types with nothing to free can be <code>Copy</code></td></tr>
+    <tr><th scope="row">Clone <code>b.clone()</code></th><td>Whatever the type's <code>clone</code> does; for <code>String</code>, a new buffer and a copy of the text</td><td>Yes</td><td>For <code>String</code>, one allocation</td></tr>
+  </tbody>
+</table>
+</div>
+<p>
+  The documentation of <code>Copy</code> describes the first two rows: "the only difference is whether you are allowed to access x after the assignment. Under the hood, both a copy and a move can result in bits being copied in memory, although this is sometimes optimized away" <a class="src" href="https://doc.rust-lang.org/std/marker/trait.Copy.html#whats-the-difference-between-copy-and-clone">std::marker::Copy</a>. A move is not a different machine operation from a copy. The difference is a rule about the source binding. A type that owns a resource, like <code>String</code>, cannot be <code>Copy</code>, because two usable copies of the handle would both free the buffer.
+</p>
+<p>Using <code>a</code> after the move gives:</p>
+<div class="codeblock codeblock--bad">
+  <div class="codeblock__label"><span><code>examples/move.rs</code></span><span class="verdict">does not compile</span></div>
+<pre class="out"><code>error[E0382]: borrow of moved value: `a`
  --&gt; move.rs:5:16
   |
 3 |     let a = String::from("hi");
@@ -652,256 +180,77 @@
   |             - value moved here
 5 |     println!("{a}");
   |                ^ value borrowed here after move</code></pre>
-                    </div>
+</div>
 
-                    <h2 id="when-values-are-dropped-and-in-what-order">
-                        When values are dropped, and in what order
-                    </h2>
-                    <p>
-                        The Reference: "When control flow leaves a drop scope
-                        all variables associated to that scope are dropped in
-                        reverse order of declaration," and only "an initialized
-                        variable" is dropped
-                        <a
-                            class="src"
-                            href="https://doc.rust-lang.org/reference/destructors.html"
-                            >Reference: destructors</a
-                        >. A binding that has been moved out of is not
-                        initialized any more, so nothing runs for it.
-                        <code>examples/moves.rs</code> shows both rules with
-                        three values that print when dropped:
-                    </p>
-                    <div class="codeblock">
-                        <div class="codeblock__label">
-                            <span
-                                >Code and output, from
-                                <code>examples/moves.rs</code></span
-                            >
-                        </div>
-                        <pre><code><span class="k">let</span> _first  = Noisy(<span class="k">"first"</span>);
+<h2 id="when-values-are-dropped-and-in-what-order">When values are dropped, and in what order</h2>
+<p>
+  The Reference: "When control flow leaves a drop scope all variables associated to that scope are dropped in reverse order of declaration," and only "an initialized variable" is dropped <a class="src" href="https://doc.rust-lang.org/reference/destructors.html">Reference: destructors</a>. A binding that has been moved out of is not initialized any more, so nothing runs for it. <code>examples/moves.rs</code> shows both rules with three values that print when dropped:
+</p>
+<div class="codeblock">
+  <div class="codeblock__label"><span>Code and output, from <code>examples/moves.rs</code></span></div>
+<pre><code><span class="k">let</span> _first  = Noisy(<span class="k">"first"</span>);
 <span class="k">let</span> second  = Noisy(<span class="k">"second"</span>);
 <span class="k">let</span> _third  = Noisy(<span class="k">"third"</span>);
 <span class="k">let</span> _kept   = second;        <span class="c">// declared last, so dropped first</span>
 println!(<span class="k">"end of main"</span>);</code></pre>
-                        <pre class="out"><code>end of main
+<pre class="out"><code>end of main
 drop second
 drop third
 drop first</code></pre>
-                    </div>
-                    <p>
-                        <code>"second"</code> is dropped first because it now
-                        belongs to <code>_kept</code>, the last binding
-                        declared. It is dropped once, not once for each binding
-                        it passed through.
-                    </p>
+</div>
+<p>
+  <code>"second"</code> is dropped first because it now belongs to <code>_kept</code>, the last binding declared. It is dropped once, not once for each binding it passed through.
+</p>
 
-                    <h2
-                        id="freeing-is-not-returning-memory-to-the-operating-system"
-                    >
-                        Freeing is not returning memory to the operating system
-                    </h2>
-                    <p>
-                        When <code>b</code> is dropped, <code>String</code>'s
-                        destructor calls the global allocator's free function
-                        <span class="tag tag-comp">Allocator</span>. The
-                        allocator usually keeps the block and reuses it for a
-                        later allocation. It is not obliged to give anything
-                        back to the kernel. glibc's <code>free</code> returns
-                        memory to the system only in some cases, such as large
-                        blocks that were mapped separately, or free space at the
-                        top of the heap
-                        <a
-                            class="src"
-                            href="https://man7.org/linux/man-pages/man3/malloc.3.html"
-                            >malloc(3)</a
-                        >
-                        <a
-                            class="src"
-                            href="https://man7.org/linux/man-pages/man3/mallopt.3.html"
-                            >mallopt(3)</a
-                        >. So after a drop, the process's memory use as the
-                        operating system sees it often does not go down
-                        <span class="tag tag-os">OS</span>.
-                    </p>
+<h2 id="freeing-is-not-returning-memory-to-the-operating-system">Freeing is not returning memory to the operating system</h2>
+<p>
+  When <code>b</code> is dropped, <code>String</code>'s destructor calls the global allocator's free function <span class="tag tag-comp">Allocator</span>. The allocator usually keeps the block and reuses it for a later allocation. It is not obliged to give anything back to the kernel. glibc's <code>free</code> returns memory to the system only in some cases, such as large blocks that were mapped separately, or free space at the top of the heap <a class="src" href="https://man7.org/linux/man-pages/man3/malloc.3.html">malloc(3)</a> <a class="src" href="https://man7.org/linux/man-pages/man3/mallopt.3.html">mallopt(3)</a>. So after a drop, the process's memory use as the operating system sees it often does not go down <span class="tag tag-os">OS</span>.
+</p>
 
-                    <div class="aside aside--wrong">
-                        <p class="aside__h">
-                            Four tempting pictures that are wrong
-                        </p>
-                        <p>
-                            "A move copies the text." It copies at most the
-                            handle. The heap buffer stays where it is, as the
-                            addresses above show.
-                        </p>
-                        <p>
-                            "Assignment always copies" or "assignment always
-                            moves." It depends on the type:
-                            <code>Copy</code> types are copied and stay usable;
-                            others are moved.
-                        </p>
-                        <p>
-                            "Ownership is tracked by the CPU or at run time." It
-                            is a compile-time rule. The machine code has drop
-                            calls in fixed places and nothing else.
-                        </p>
-                        <p>
-                            "Dropping gives memory back to the OS." It gives the
-                            block back to the allocator.
-                        </p>
-                    </div>
+<div class="aside aside--wrong">
+  <p class="aside__h">Four tempting pictures that are wrong</p>
+  <p>"A move copies the text." It copies at most the handle. The heap buffer stays where it is, as the addresses above show.</p>
+  <p>"Assignment always copies" or "assignment always moves." It depends on the type: <code>Copy</code> types are copied and stay usable; others are moved.</p>
+  <p>"Ownership is tracked by the CPU or at run time." It is a compile-time rule. The machine code has drop calls in fixed places and nothing else.</p>
+  <p>"Dropping gives memory back to the OS." It gives the block back to the allocator.</p>
+</div>
 
-                    <section class="keep" aria-labelledby="keep-h">
-                        <h2 id="keep-h">What to remember</h2>
-                        <ol>
-                            <li>
-                                Every value has exactly one owner; when the
-                                owner goes out of scope, the value is dropped,
-                                once.
-                            </li>
-                            <li>
-                                A move transfers ownership and copies at most
-                                the value's own bytes; the old binding can no
-                                longer be used. <code>Copy</code> types stay
-                                usable; <code>clone</code> makes a real
-                                duplicate.
-                            </li>
-                            <li>
-                                Bindings are dropped in reverse order of
-                                declaration; dropping gives memory back to the
-                                allocator, not necessarily to the OS.
-                            </li>
-                        </ol>
-                    </section>
+<section class="keep" aria-labelledby="keep-h">
+  <h2 id="keep-h">What to remember</h2>
+  <ol>
+    <li>Every value has exactly one owner; when the owner goes out of scope, the value is dropped, once.</li>
+    <li>A move transfers ownership and copies at most the value's own bytes; the old binding can no longer be used. <code>Copy</code> types stay usable; <code>clone</code> makes a real duplicate.</li>
+    <li>Bindings are dropped in reverse order of declaration; dropping gives memory back to the allocator, not necessarily to the OS.</li>
+  </ol>
+</section>
 
-                    <section class="test" aria-labelledby="test-h">
-                        <h2 id="test-h">Check your understanding</h2>
-                        <details>
-                            <summary>
-                                After <code>let b = a;</code> with a
-                                <code>String</code>, how many heap buffers hold
-                                <code>"hi"</code>?
-                            </summary>
-                            <div>
-                                <p>
-                                    One. The handle moved to <code>b</code>; the
-                                    buffer was not touched.
-                                </p>
-                            </div>
-                        </details>
-                        <details>
-                            <summary>
-                                Why can <code>i32</code> be
-                                <code>Copy</code> but
-                                <code>String</code> cannot?
-                            </summary>
-                            <div>
-                                <p>
-                                    An <code>i32</code> owns nothing else, so
-                                    two copies are harmless. Two usable copies
-                                    of a <code>String</code> handle would both
-                                    free the same buffer.
-                                </p>
-                            </div>
-                        </details>
-                        <details>
-                            <summary>
-                                In <code>let x = S("x"); let y = S("y");</code>,
-                                which is dropped first at the end of the scope?
-                            </summary>
-                            <div>
-                                <p>
-                                    <code>y</code>: bindings are dropped in
-                                    reverse order of declaration.
-                                </p>
-                            </div>
-                        </details>
-                    </section>
+<section class="test" aria-labelledby="test-h">
+  <h2 id="test-h">Check your understanding</h2>
+  <details>
+    <summary>After <code>let b = a;</code> with a <code>String</code>, how many heap buffers hold <code>"hi"</code>?</summary>
+    <div><p>One. The handle moved to <code>b</code>; the buffer was not touched.</p></div>
+  </details>
+  <details>
+    <summary>Why can <code>i32</code> be <code>Copy</code> but <code>String</code> cannot?</summary>
+    <div><p>An <code>i32</code> owns nothing else, so two copies are harmless. Two usable copies of a <code>String</code> handle would both free the same buffer.</p></div>
+  </details>
+  <details>
+    <summary>In <code>let x = S("x"); let y = S("y");</code>, which is dropped first at the end of the scope?</summary>
+    <div><p><code>y</code>: bindings are dropped in reverse order of declaration.</p></div>
+  </details>
+</section>
 
-                    <p class="related">
-                        <b>Related:</b>
-                        <a href="10-string-and-vec-memory.html"
-                            >handles and buffers</a
-                        >
-                        ·
-                        <a href="12-references-borrowing-and-lifetimes.html"
-                            >using a value without owning it</a
-                        >
-                        ·
-                        <a href="14-memory-bugs-and-rust-safety.html"
-                            >what a double free or use-after-free does</a
-                        >
-                    </p>
+<p class="related"><b>Related:</b> <a href="10-string-and-vec-memory.html">handles and buffers</a> · <a href="12-references-borrowing-and-lifetimes.html">using a value without owning it</a> · <a href="14-memory-bugs-and-rust-safety.html">what a double free or use-after-free does</a></p>
 
-                    <p>
-                        <b>Next question:</b> moving <code>scores</code> into a
-                        function would make it unusable afterwards.
-                        <a href="12-references-borrowing-and-lifetimes.html"
-                            >How can a function use a value that it does not
-                            own?</a
-                        >
-                    </p>
-                    <nav class="pager" aria-label="Previous and next">
-                        <a
-                            class="pager__prev"
-                            href="10-string-and-vec-memory.html"
-                            rel="prev"
-                            ><span class="pager__dir">← Previous</span
-                            ><span class="pager__q"
-                                >What is a Vec made of, and what happens when it
-                                grows?</span
-                            ></a
-                        >
-                        <a
-                            class="pager__next"
-                            href="12-references-borrowing-and-lifetimes.html"
-                            rel="next"
-                            ><span class="pager__dir">Next →</span
-                            ><span class="pager__q"
-                                >How can code use a value it does not own?</span
-                            ></a
-                        >
-                    </nav>
-                </article>
-                <footer class="foot">
-                    <p>
-                        Observed values, such as addresses, sizes, assembly and
-                        program output, come from one machine. It runs Linux 7.0
-                        (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with
-                        rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack
-                        limit. Addresses change on every run, and other systems,
-                        toolchains and allocators can differ. Details:
-                        <a href="../reference/sources.html">Sources</a> ·
-                        <code>examples/OUTPUT.txt</code>.
-                    </p>
-                </footer>
-            </main>
-            <nav class="otp" aria-label="On this page">
-                <p class="otp__h">On this page</p>
-                <ol class="otp__list">
-                    <li class="lv2">
-                        <a href="#one-owner-per-value">One owner per value</a>
-                    </li>
-                    <li class="lv2">
-                        <a href="#move-copy-and-clone">Move, copy and clone</a>
-                    </li>
-                    <li class="lv2">
-                        <a href="#when-values-are-dropped-and-in-what-order"
-                            >When values are dropped, and in what order</a
-                        >
-                    </li>
-                    <li class="lv2">
-                        <a
-                            href="#freeing-is-not-returning-memory-to-the-operating-system"
-                            >Freeing is not returning memory to the operating
-                            system</a
-                        >
-                    </li>
-                    <li class="lv2"><a href="#keep-h">What to remember</a></li>
-                    <li class="lv2">
-                        <a href="#test-h">Check your understanding</a>
-                    </li>
-                </ol>
-            </nav>
-        </div>
-    </body>
+<p><b>Next question:</b> moving <code>scores</code> into a function would make it unusable afterwards. <a href="12-references-borrowing-and-lifetimes.html">How can a function use a value that it does not own?</a></p>
+<nav class="pager" aria-label="Previous and next">
+<a class="pager__prev" href="10-string-and-vec-memory.html" rel="prev"><span class="pager__dir">← Previous</span><span class="pager__q">What is a Vec made of, and what happens when it grows?</span></a>
+<a class="pager__next" href="12-references-borrowing-and-lifetimes.html" rel="next"><span class="pager__dir">Next →</span><span class="pager__q">How can code use a value it does not own?</span></a>
+</nav>
+</article>
+<footer class="foot"><p>Observed values, such as addresses, sizes, assembly and program output, come from one machine. It runs Linux 7.0 (Ubuntu, glibc) on x86-64: an Intel Core i5-12450H with rustc 1.98.1, 4 KiB pages and an 8 MiB main-thread stack limit. Addresses change on every run, and other systems, toolchains and allocators can differ. Details: <a href="../reference/sources.html">Sources</a> · <code>examples/OUTPUT.txt</code>.</p></footer>
+</main>
+<nav class="otp" aria-label="On this page"><p class="otp__h">On this page</p><ol class="otp__list"><li class="lv2"><a href="#one-owner-per-value">One owner per value</a></li><li class="lv2"><a href="#move-copy-and-clone">Move, copy and clone</a></li><li class="lv2"><a href="#when-values-are-dropped-and-in-what-order">When values are dropped, and in what order</a></li><li class="lv2"><a href="#freeing-is-not-returning-memory-to-the-operating-system">Freeing is not returning memory to the operating system</a></li><li class="lv2"><a href="#keep-h">What to remember</a></li><li class="lv2"><a href="#test-h">Check your understanding</a></li></ol></nav>
+</div>
+</body>
 </html>
